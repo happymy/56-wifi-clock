@@ -1,23 +1,18 @@
 #ifndef STC15_H
 #define STC15_H
 
-/* STC15W408AS 寄存器（与 Keil/SDCC 通用 sfr 语法） */
-sfr P0 = 0x80;
-sfr P1 = 0x90;
-sfr P2 = 0xA0;
-sfr P3 = 0xB0;
-sfr P4 = 0xC0;
-sfr PSW = 0xD0;
-sfr ACC = 0xE0;
-sfr SP = 0x81;
-sfr PCON = 0x87;
-sfr TCON = 0x88;
-sfr TMOD = 0x89;
-sfr TL0 = 0x8C;
-sfr TH0 = 0x8D;
-sfr TL1 = 0x8A;
-sfr TH1 = 0x8B;
-sfr IE = 0xA8;
-sfr IP = 0xB8;
+/* STC15W408AS 寄存器定义。
+   SDCC 用 __sfr __at(addr)，Keil C51 用 sfr addr；用宏统一。
+   仅放地址确定的标准 8051 寄存器；STC15 扩展 SFR 按模块追加并校订地址。 */
+#if defined(__SDCC)
+  #define __SFR(name, addr)  __sfr  __at(addr) name
+#else /* Keil C51 */
+  #define __SFR(name, addr)  sfr  name = addr
+#endif
+
+__SFR(P0, 0x80);
+__SFR(P1, 0x90);
+__SFR(P2, 0xA0);
+__SFR(P3, 0xB0);
 
 #endif
