@@ -23,14 +23,16 @@ static unsigned int adc_read(unsigned char ch) {
     return ((unsigned int)ADC_RES << 2) | (ADC_RESL & 0x03);
 }
 
-/* 非阻塞报警：8 步×250ms ≈ 2s 经典 BB(响250/停250×4)。循环照常跑，不阻塞光敏。 */
+/* 非阻塞报警：8 步×250ms ≈ 2s 经典 BB(响250/停250×4)。每 250ms 调 alarm_tick 推进一步，
+   蜂鸣由 alarm_buzz 标志统一驱动（与“两键同按响”合并控制，避免冲突）。 */
 static unsigned char alarm_on;
 static unsigned char alarm_step;
-static void alarm_start(void) { alarm_on = 1; alarm_step = 0; }
+static unsigned char alarm_buzz;
+static void alarm_start(void) { alarm_on = 1; alarm_step = 0; alarm_buzz = 0; }
 static void alarm_tick(void) {
-    if (!alarm_on) return;
-    if (alarm_step & 1) BEEP_OFF(); else BEEP_ON();
-    if (++alarm_step >= 8) { alarm_on = 0; BEEP_OFF(); }
+    if (!alarm_on) { alarm_buzz = 0; return; }
+    alarm_buzz = (alarm_step & 1) ? 0 : 1;        /* 响/停交替 */
+    if (++alarm_step >= 8) { alarm_on = 0; alarm_buzz = 0; }
 }
 
 /* 大屏(GRID1-4, LED2-5) 显示 0..9999 的 4 位值，GRID3(LED4) 倒装补偿。 */
@@ -82,18 +84,6 @@ void main(void) {
     alarm_start();               /* 显示后才响 2 秒报警音(非阻塞) */
 
     while (1) {
-        unsigned char up   = (unsigned char)(!(P3 & 0x04));   /* P3.2=UP，按下=低 */
-        unsigned char set  = (unsigned char)(!(P3 & 0x08));   /* P3.3=SET，按下=低 */
-
-        if (up && set) {                                  /* 两键同按：计 2s 回滚动 */
-            if (++both_cnt >= 8) mode = MODE_SCROLL;
-        } else {
-            both_cnt = 0;
-            if (set && !prev_set) mode = MODE_LIGHT;       /* 单击 SET */
-            else if (up && !prev_up) mode = MODE_TEMP;     /* 单击 UP */
-        }
-        prev_up = up; prev_set = set;
-
         light = adc_read(0);
         {                                               /* 光敏标定：遮住≈512..767→0(最暗)，强光<~85→7(最亮) */
             unsigned int t = light;
@@ -121,7 +111,27 @@ void main(void) {
         }
 
         tm1639_write_display(disp);
-        alarm_tick();
-        delay_ms(250);
+        alarm_tick();                                    /* 推进启动报警(250ms 一步) */
+
+        /* 按键快扫：每 ~20ms 一次(250ms 内 12 次)，避免单击落在轮询空隙被漏掉 */
+        {
+            unsigned char k;
+            for (k = 0; k < 12; k++) {
+                unsigned char up  = (unsigned char)(!(P3 & 0x04));   /* P3.2=UP，按下=低 */
+                unsigned char set = (unsigned char)(!(P3 & 0x08));   /* P3.3=SET，按下=低 */
+                if (up && set) {
+                    if (++both_cnt >= 100) mode = MODE_SCROLL;       /* 同按 2s 回滚动 */
+                } else {
+                    both_cnt = 0;
+                    if (set && !prev_set) mode = MODE_LIGHT;         /* 单击 SET */
+                    else if (up && !prev_up) mode = MODE_TEMP;      /* 单击 UP */
+                }
+                prev_up = up; prev_set = set;
+                if (up && set) BEEP_ON();          /* 两键同按：持续响 */
+                else if (alarm_buzz) BEEP_ON();    /* 启动报警脉冲 */
+                else BEEP_OFF();                   /* 其余静音 */
+                delay_ms(20);
+            }
+        }
     }
 }

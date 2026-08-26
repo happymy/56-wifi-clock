@@ -2,13 +2,13 @@
 chcp 936 >nul
 cd /d %~dp0
 setlocal
-REM Build firmware for STC15W408AS with SDCC (https://sdcc.sourceforge.net)
-REM SDCC ��װ�� C:\Program Files\SDCC\bin��������ʱ���˵� PATH��
+REM Build STC15W408AS demo (clock-bringup) with SDCC
+REM shared drivers live in ../_common; this demo only adds src/main.c
 set SDCC_BIN=C:\Program Files\SDCC\bin
 if exist "%SDCC_BIN%\sdcc.exe" set "PATH=%SDCC_BIN%;%PATH%"
 if not exist out mkdir out
-sdcc -mmcs51 -c -o out\tm1639.rel src\tm1639.c
-sdcc -mmcs51 -c -o out\main.rel src\main.c
+sdcc -mmcs51 -I../_common -c -o out\tm1639.rel ../_common\tm1639.c
+sdcc -mmcs51 -I../_common -c -o out\main.rel src\main.c
 sdcc -mmcs51 --code-size 8192 --iram-size 512 -o out\firmware.ihx out\tm1639.rel out\main.rel
 packihx out\firmware.ihx > out\firmware.hex
 echo Build done: out\firmware.hex
