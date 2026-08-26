@@ -23,10 +23,8 @@ firmware/        活动固件工程（SDCC），开发在此进行
   src/main.c         主程序（当前：点亮测试，8 位显示 1-8）
   build.bat          SDCC 编译 → firmware/out/firmware.hex
   .gitignore         忽略 out/ 编译产物
-src/  test/          早期验证骨架（P1.0 闪烁 / Timer0 中断 demo），已被 firmware/ 取代，仅供参照
-doc/                 数据手册（STC15W408AS.pdf、TM1639.pdf）+ 原版功能分析（原版时钟功能.md）
+doc/                 数据手册（STC15W408AS.pdf、TM1639.pdf、STC15W408AS-硬件选项.md）+ 原版功能分析（原版时钟功能.md）
 plan/                原理图.md（引脚映射，权威）、固件复刻计划.md（复刻路线）
-build.bat            遗留脚本（编译旧 src/main.c），已被 firmware/build.bat 取代
 ```
 
 ## 构建
