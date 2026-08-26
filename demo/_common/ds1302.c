@@ -39,18 +39,6 @@ static void ds_write_byte(unsigned char addr, unsigned char dat) {
     P1 &= ~DS_CE;
 }
 
-static unsigned char ds_read_byte(unsigned char addr) {
-    unsigned char i, dat = 0;
-    P1 &= ~DS_SCLK;             /* DS1302：CE 上升沿前 SCLK 须为低，否则移位错位(读出乱码) */
-    P1 |= DS_CE;
-    ds_delay();
-    for (i = 0; i < 8; i++) { ds_write_bit(addr & 1u); addr >>= 1; }
-    P1 |= DS_IO;                 /* 释放 IO 为输入(准双向) */
-    for (i = 0; i < 8; i++) if (ds_read_bit()) dat |= (1u << i);
-    P1 &= ~DS_CE;
-    return dat;
-}
-
 static unsigned char ds_bcd_ok(unsigned char v, unsigned char max) {
     return (((v >> 4) & 0xF) <= 9 && (v & 0xF) <= 9 && v <= max);
 }
@@ -69,12 +57,11 @@ static void ds_write_base(void) {
 
 void ds1302_init(void) {
     ds_time t;
-    unsigned char s = ds_read_byte(0x81);   /* 读秒 */
-    if (s & 0x80) {                          /* CH=1：停振未走时 */
+    ds1302_read_time(&t);                    /* 突发读，可靠(单字节 ds_read_byte 连续读会被芯片忽略) */
+    if (t.sec & 0x80) {                      /* CH=1：停振未走时 */
         ds_write_base();
         return;
     }
-    ds1302_read_time(&t);                    /* 已在走时，但 RAM 可能是垃圾 */
     if (!ds_bcd_ok(t.sec, 0x59) || !ds_bcd_ok(t.min, 0x59) ||
         !ds_bcd_ok(t.hr, 0x23) || t.date == 0 || !ds_bcd_ok(t.date, 0x31) ||
         t.month == 0 || !ds_bcd_ok(t.month, 0x12) || !ds_bcd_ok(t.year, 0x99)) {
