@@ -7,6 +7,8 @@ const unsigned char seg_font[16] = {
     0x7F, 0x6F, 0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71
 };
 
+static unsigned char g_bright = 7;   /* 当前亮度 0..7，写屏/调亮度共用 */
+
 /* 7 段数码管旋转 180°：补偿物理倒装管（a↔d, b↔e, c↔f, g↔g）。
    倒装管顶部 view_a 实为 tube_d 段，故 view_seg = rotate(tube_seg)。 */
 unsigned char seg_rotate180(unsigned char d) {
@@ -63,14 +65,15 @@ void tm1639_write_display(const unsigned char data[8]) {
     P2 |= TM_STB_MASK; tm_delay();
 
     P2 &= ~TM_STB_MASK; tm_delay();
-    tm_write_byte(0x8F);              /* 显示控制：开 + 最大亮度 */
+    tm_write_byte(0x88 | g_bright);  /* 显示控制：开 + 当前占空比(0..7) */
     P2 |= TM_STB_MASK;
 }
 
 void tm1639_set_brightness(unsigned char level) {
     unsigned char cmd;
     if (level > 7) level = 7;
-    cmd = 0x80 | (level << 1) | 0x01; /* 亮度 + 显示开 */
+    g_bright = level;
+    cmd = 0x88 | level;   /* 显示开 + 占空比 0..7（0=1/16 最暗，7=最亮） */
     P2 &= ~TM_STB_MASK; tm_delay();
     tm_write_byte(cmd);
     P2 |= TM_STB_MASK;
