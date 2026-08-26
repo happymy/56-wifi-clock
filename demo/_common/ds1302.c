@@ -82,8 +82,10 @@ void ds1302_init(void) {
     }
 }
 
+/* ponytail: 读用突发(单 CE 周期，实测稳定)；单字节 ds_read_byte 在连续多次 CE 间会被芯片忽略
+   读回全 FF。写用单字节 ds_write_byte(与 ds_write_base 同路径，实测可靠) */
 void ds1302_read_time(ds_time *t) {
-    unsigned char i;
+    unsigned char i, k, b;
     unsigned char *p = (unsigned char *)t;
     P1 &= ~DS_SCLK;             /* DS1302：CE 上升沿前 SCLK 须为低，否则移位错位(读出乱码) */
     P1 |= DS_CE;
@@ -92,8 +94,8 @@ void ds1302_read_time(ds_time *t) {
     for (i = 0; i < 8; i++) { ds_write_bit(addr & 1u); addr >>= 1; }
     P1 |= DS_IO;                             /* 释放 IO */
     for (i = 0; i < 8; i++) {                /* 突发读须读满 8 字节(WP 在后)，否则芯片停在突发中，
-                                               下次读命令被忽略 -> 全 FF；多读的第 8 字节丢弃 */
-        unsigned char b = 0, k;
+                                                下次读命令被忽略 -> 全 FF；多读的第 8 字节丢弃 */
+        b = 0;
         for (k = 0; k < 8; k++) if (ds_read_bit()) b |= (1u << k);
         if (i < 7) p[i] = b;
     }
@@ -101,19 +103,13 @@ void ds1302_read_time(ds_time *t) {
 }
 
 void ds1302_write_time(const ds_time *t) {
-    unsigned char i, k, byte;
-    const unsigned char *p = (const unsigned char *)t;
     ds_write_byte(0x8E, 0x00);   /* 解除写保护 */
-    P1 &= ~DS_SCLK;             /* DS1302：CE 上升沿前 SCLK 须为低，否则移位错位(读出乱码) */
-    P1 |= DS_CE;
-    ds_delay();
-    byte = 0xBE;                 /* 时钟突发写命令 */
-    for (i = 0; i < 8; i++) { ds_write_bit(byte & 1u); byte >>= 1; }
-    for (i = 0; i < 7; i++) {    /* 7 字节：sec,min,hr,date,month,weekday,year */
-        byte = p[i];
-        for (k = 0; k < 8; k++) { ds_write_bit(byte & 1u); byte >>= 1; }
-    }
-    byte = 0x00;                 /* WP 字节：保持可写，便于后续再次写入 */
-    for (k = 0; k < 8; k++) { ds_write_bit(byte & 1u); byte >>= 1; }
-    P1 &= ~DS_CE;
+    ds_write_byte(0x80, t->sec);
+    ds_write_byte(0x82, t->min);
+    ds_write_byte(0x84, t->hr);
+    ds_write_byte(0x86, t->date);
+    ds_write_byte(0x88, t->month);
+    ds_write_byte(0x8A, t->weekday);
+    ds_write_byte(0x8C, t->year);
+    ds_write_byte(0x8E, 0x80);   /* 写保护，防误写(不影响芯片自身走时) */
 }

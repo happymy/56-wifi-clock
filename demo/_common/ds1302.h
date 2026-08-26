@@ -14,7 +14,7 @@ typedef struct {
 } ds_time;
 
 void ds1302_init(void);          /* 未走时则写入默认时间并启动 */
-void ds1302_read_time(ds_time *t); /* 突发读 7 字节，BCD */
-void ds1302_write_time(const ds_time *t); /* 突发写 7 字节，BCD（写前自动解写保护） */
+void ds1302_read_time(ds_time *t); /* 突发读 8 字节(第8字节 WP 丢弃)，BCD */
+void ds1302_write_time(const ds_time *t); /* 单字节写 7 寄存器，BCD（写前自动解写保护） */
 
 #endif
