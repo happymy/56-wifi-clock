@@ -1,7 +1,0 @@
-out/
-*.rel
-*.ihx
-*.lst
-*.map
-*.mem
-*.sym
