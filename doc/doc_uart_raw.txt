@@ -1,0 +1,1353 @@
+General Overview of STC15W401AS series MCU
+1.  Introduction of STC15W401AS series MCU (In abundant supply)
+STC15W401AS series MCU is a single-chip microcontroller based on a high performance 1T architecture 
+8051 CPU, which is produced by STC MCU Limited. It is a new generation of 8051 MCU of  high speed, high 
+stability, wide voltage range, low power consumption and super strong anti-disturbance. Besides, STC15W401AS 
+series MCU is a MCU of super advanced encryption, because it adopts the ninth generation of STC encryption 
+technology. With the enhanced kernel, STC15W401AS series MCU is faster than a traditional 8051 in executing 
+instructions (about 8~12 times the rate of a traditional 8051 MCU), and has a fully compatible instruction set 
+with traditional 8051 series microcontroller. External expensive crystal can be removed by being integrated 
+internal high-precise R/C clock( f0.3%) with f1% temperature drift (-40 ć~+85ć) while f0.6% in normal 
+temperature (-20 ć~+65ć) and wide frenquency adjustable between 5MHz and 35MHz. External reset curcuit 
+also can be removed by being integrated internal highly reliable one with 16 levels optional threshold voltage of 
+reset. The STC15W401AS series MCU retains all features of the traditional 8051. In addition, it has 3-channels 
+CCP/PCA/PWM, 8-channels and 10-bits A/D Converter(300 thousand times per sec.), a high-speed asynchronous 
+serial port----UART( can be regarded as 3 serial ports by shifting among 3 groups of pins) and a high-speed 
+synchronous serial peripheral interface----SPI. STC15W401AS series MCU is usually used in communications 
+which need for serveral UARTs or electrical control or some occasion with strong disturbance.
+In Keil C development environment, select the Intel 8052 to compiling and only contain < reg51.h > as head-
+er file.
+STC15 series MCU with super high-speed CPU core of STC-Y5 works 20% faster than STC early 1T series 
+(such as STC12/STC11/STC10 series) at same clock frequency.
+Enhanced 8051 Central Processing Unit, 1T, single clock per machine cycle, faster 8~12 times than the rate of 
+a traditional 8051.
+Operating voltage range:  5.5V  ~  2.4V .  
+On-chip 4K/8K/10K/12K/13K/15.5K FLASH program memory with flexible ISP/IAP capability, can be 
+repeatedly erased more than 100 thousand times.
+on-chip 512 bytes SRAM: 256 byte scratch-pad RAM and 256 bytes of auxiliary RAM
+On-chip EEPROM with large capacity can be repeatedly erased more than 100 thousand times.
+ISP/IAP, In-System-Programming and In-Application-Programming , no need for programmer and emulator.
+8 channels and 10 bits Analog-to-Digital Converter (ADC), the speed up to 300 thousand times per second, 3 
+channels PWM also can be used as 3 channels D/A Converter(DAC). 
+3 channels Capture/Compare uints(CCP/PCA/PWM)
+---- can be used as 3 Times or 3 external Interrupts(can be generated on rising or falling edge) or 3 channels 
+D/A Converter.
+The high-speed pulse function of CCP/PCA can be utilized to to realize 3 channels 9 ~ 16 bit PWM (each 
+channel of which takes less than 0.6% system time) 
+The clock output function of T0, T1 or T2 can be utilized to realize 8 ~ 16 bit PWM with a high degree of 
+accuracy (which takes less than 0.4% system time)
+Internal hghly reliable Reset with 16 levels optional threshold voltage of reset, external reset curcuit can be 
+completely removed
+
+
+
+
+
+
+
+
+
+
+
+*HQHUDO2YHUYLHZRI67&:$6VHULHV0&8
+
+Internal high- precise R/C clock( f0.3%) with f1% temperature drift (-40 ć~+85ć) while f0.6% (-20ć
+~+65ć) in normal temperature and wide frenquency adjustable between 5MHz and 35MHz (5.5296MHz / 
+11.0592MHz / 22.1184MHz / 33.1776MHz)
+No need external crystal and reset, and can output clock and low reset signal from MCU.
+Operating frequency range: 0- 35MHz, is equivalent to traditional 8051:0~420MHz.
+A
+ high-speed asynchronous serial port----UART ( can  be regarded as 3 serial ports by shifting among 3 groups 
+of pins):
+UART(RxD/P3.0, TxD/P3.1) can be switched to (RxD_2/P3.6, TxD_2/P3.7),
+            also can be switched to (RxD_3/P1.6, TxD_3/P1.7).
+A high-speed synchronous serial peripheral interface----SPI. 
+Support the function of Encryption Download (to protect your code from being intercepted).
+Support the function of RS485 Control
+Code protection for flash memory access, excellent noise immunity, very low power consumption
+Power management mode: Slow-Down mode, Idle mode(all interrupt can wake up Idle mode), Stop/Power
+-
+Down mode.
+Timers which can wake up stop/power-down mode: have internal low-power special wake-up Timer.
+Resource which can wake up stop/power
+-down mode are: INT0/P3.2, INT1/P3.3 (INT0/INT1, may be 
+generated on both rising and falling edges), 
+INT2/P3.6, INT3/P3.7, INT4/P3.0 ( INT2
+/INT3/INT4, only be generated on falling 
+edge); pins CCP0/CCP1/CCP2; pins RxD; pins 
+T0/T2(their falling edge can wake up if T0/T2 
+have been enabled before power-down mode, 
+but no interrupts can be generatetd); internal 
+low-power special wake-up Timer.
+Five Timers/Counters, two 16-bit reloadable Timer/Counter(T0/T2, T0 is compatible with Timer0 of traditional 
+8051), T0/T2 all can independently achieve external programmable clock output,  3 channels CCP/PWM/PCA 
+also can be used as three timers.
+Programmable clock output function(output by dividing the frequency of the internal system clock or the  
+input clock of external pin):
+The speed of external programmable clock output of 5V MCU is also not more than 13.5MHz, because the 
+output speed of I/O port of STC15 series 5V
+ MCU is not more than 13.5MHz.
+The speed of external programmable clock output  of 3.3V MCU is also not more than 8MHz, because the 
+output speed of I/O port of STC15 series 3.3V MCU is not more than 8MHz.
+ķ The Programmable clock output of T0 is on P3.5/T0CLKO (output by dividing the frequency of the internal
+system clock or the  input clock of external pin T0/P3.4)
+ĸ The Programmable clock output of T2 is on P3.0/T2CLKO (output by dividing the frequency of the internal
+system clock or the  input clock of external pin T2/P3.1)
+Two timers/counters in above all can be output by dividing the frequency from 1 to 65536.
+Ĺ The Programmable clock output of master clock is on P5.4/SysClkO, and its frequency can be divided into
+SysClk/1, SysClk/2, SysClk/4./1, SysClk/2, SysClk/4., SysClk/2, SysClk/4. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+General Overview of STC15W401AS series MCU
+2
+The master clock can either be internal R/C clock or the external input clock or the external crystal 
+oscillator.
+SysClk is the frequency of master clock. SysClkO is the output of master clock. 
+Comparator, which support comparing by external pin CMP+ and CMP- or internal reference voltage and 
+generating output signal (its polarity can be configured) on CMPO pin can be used as 1 channel 
+ADC or 
+brownout detect function.
+One 15 bits Watch-Dog-Timer with 8-bit pre-scaler (one-time-enabled)
+advanced instruction set, which is fully compatible with traditional 8051 MCU, have hardware multiplication / 
+division command.
+26/18/14 common I/O ports are available, their mode is quasi_bidirectional/weak pull-up (traditional 8051 
+I/O ports mode) after reset, and can be set to four modes:  quasi_bidirectional/weak pull-up, strong push-pull/ 
+strong pull-up, input-only/high-impedance and open drain.
+the driving ability of each I/O port can be up to 20mA, but the current of the whole chip don’t exceed this 
+maximum 90mA.
+If I/O ports are not enough, it can be extended by connecting a 74HC595(reference price: RMB 0.15 yuan). 
+Besides, cascading several chips also can extend to dozens of  I/O ports.
+Package: SOP28, TSSOP28 (6.4mm x 9.7mm), QFN28 (5mm x 5mm), SKDIP28, SOP20, DIP20,
+TSSOP20(6.5mm x 6.5mm), SOP16, DIP16.
+All products are baked 8 hours in high-temperature 175 ć after be packaged, Manufacture guarantee good  
+quality.
+In Keil C development environment, select the Intel 8052 to compiling and only contain < reg51.h > as header 
+file.
+
+
+
+
+
+
+
+General Overview of STC15W401AS series MCU
+3
+2.  Block diagram of STC15W401AS series
+The internal structure of STC15W401AS series MCU is shown in the block diagram below. STC15W401AS 
+series MCU includes central processor unit(CPU), program memory (Flash), data memory(SRAM), Timers/
+Counters, power-down wake-up Timer, I/O ports, high-speed A/D converter(ADC), Comparator, Watchdog, high-
+speed asynchronous serial communication ports---UART, CCP/PWM/PCA, a group of high-speed synchronous 
+serial peripheral interface (SPI), internal high- precise R/C clock, internal hghly reliable Reset and so on. 
+STC15W401AS series MCU almost includes  all of the modules required  in data acquisition and control, and can 
+be regarded as an on-chip  system (SysTem Chip or SysTem on Chip, abbreviated as STC, this is the name origin 
+of Hongjing technology STC Limited).
+STC15W401AS series Block Diagram
+Program Memory 
+(Flash) 4 ~ 15.5K
+Program Counter 
+(PC)
+CCP/PCA/PWM
+SPI
+ACC
+TMP2 TMP1
+Stack
+Pointer
+ALU
+PSW WDT
+Control
+Unit
+XTAL2XTAL1
+ISP/IAP
+Address
+Generator
+Timer/Counter 0
+Enhanced
+UART1
+Port 2,3,5
+Latch
+Port 2,3,5
+Driver
+P2, P3, P5
+Port1 Latch
+Port 1 Driver
+P1.0 ~ P1.7
+ADC
+P1.0 ~ P1.7
+8
+Timer/Counter 2
+Power-Down Wake-up 
+Special Timer
+internal hghly reliable Reset
+(16 levels optional threshold 
+voltage of reset)
+RAM
+256 Bytes
+RAM ADDR
+RegisterB Register
+AUX-RAM
+256 Bytes
+Comparator
+internal high-precise R/C clock(±0.3%)
+f1% temperature drift(-40ć~+85ć) while 
+f0.6% in normal temperature (-20ć~+65ć)
+General Overview of STC15W401AS series MCU
+4
+All packages meet EU RoHS standards
+3.  Pin Configurations of STC15W401AS series MCU
+8 channels of A/D Converter are 
+on P1.P1.x/ADCx means P1.x 
+can be used as A/D conversion 
+channel in the pin map.
+SysClkO is the output of master 
+clock whose frequency can be 
+divided into SysClk/1, SysClk/2,/1, SysClk/2, , SysClk/2, 
+SysClk/4
+The master clock can either be 
+internal R/C clock or the external 
+input clock or the external crystal 
+oscillator. SysClk is the frequency 
+of master clock.
+T0CLKO refers to the programmable clock output of Timer/Counter 0
+(output by dividing the frequency of the internal system clock or the  input clock of external pin T0/P3.4);
+T2CLKO refers to the programmable clock output of Timer/Counter 2
+(output by dividing the frequency of the internal system clock or the  input clock of external pin T2/P3.1);
+In addition to programmable output on the internal system clock, T0CLKO/T2CLKO also can be used as divider by dividing the 
+frequency of the internal system clock or the  input clock of external pin T0/T2.
+Recommend UART1 on [P3.6/RxD_2, P3.7/TxD_2] 
+or [P1.6/RxD_3/XTAL2, P1.7/TxD_3/XTAL1]
+CCP is abbreviation for Capture, Compare, PWM
+The speed of external programmable 
+clock output of 5V MCU is also not 
+more than 13.5MHz, because the output 
+speed of I/O port of STC15 series 5V 
+MCU is not more than 13.5MHz.
+The speed of external programmable 
+clock output of 3.3V MCU is also not 
+more than 8MHz, because the output 
+speed of I/O port of STC15 series 3.3V 
+MCU is not more than 8MHz.
+28
+27
+26
+25
+24
+23
+22
+21
+20
+19
+18
+17
+16
+15
+CCP1_3/P2.6
+CCP2_3/P2.7
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+26 I/O  ports
+SOP28/TSSOP28/SKDIP28
+CCP1/ADC0/P1.0
+CMPO/ECI/SS/ADC2/P1.2
+Vcc
+CMP+/P5.5
+Gnd
+XT
+AL1/TxD_3/ADC7/P1.7
+CMP-/SysClkO/RST/P5.4
+CCP0/ADC1/P1.1
+SCLK/ADC5/P1.5
+SysClkO_2/XT
+AL2/RxD_3/ADC6/P1.6
+MISO/ADC4/P1.4
+MOSI/ADC3/P1.3
+P2.5/CCP0_3
+P2.4/ECI_3/SS_2
+P2.3/MOSI_2
+P2.2/MISO_2
+P2.1/SCLK_2
+P2.0/RSTOUT_LOW
+P3.4/T0//ECI_2
+P3.3/INT1
+P3.2/INT0
+P3.1/TxD/T2
+P3.5/T0CLKO/CCP0_2
+P3.6/INT2/RxD_2/CCP1_2
+P3.7/INT3/TxD_2/CCP2/CCP2_2
+P3.0/RxD/INT4/T2CLKO
+SOP28/SKDIP28
+21
+20
+19
+18
+17
+16
+15
+1
+2
+3
+4
+5
+6
+7
+QFN28
+5mm x 5mm
+26 I/O ports
+22
+23
+24
+25
+26
+27
+28
+14
+13
+12
+11
+10
+9
+8
+CCP1_3/P2.6
+CCP2_3/P2.7
+CCP1/ADC0/P1.0
+CMPO/ECI/SS/ADC2/P1.2
+Vcc
+CMP+/P5.5
+Gnd
+XTAL1/TxD_3/ADC7/P1.7
+CMP-/SysClkO/RST/P5.4
+CCP0/ADC1/P1.1
+SCLK/ADC5/P1.5
+SysClkO_2/XTAL2/RxD_3/ADC6/P1.6
+MISO/ADC4/P1.4
+MOSI/ADC3/P1.3
+CCP0_3/P2.5
+SS_2/ECI_3/P2.4
+MOSI_2/P2.3
+P2.2/MISO_2
+P2.1/SCLK_2
+P2.0/RSTOUT_LOW
+P3.4/T0//ECI_2
+P3.3/INT1
+P3.2/INT0
+P3.1/TxD/T2
+P3.5/T0CLKO/CCP0_2
+P3.6/INT2/RxD_2/CCP1_2
+P3.7/INT3/TxD_2/CCP2/CCP2_2
+P3.0/RxD/INT4/T2CLKO
+General Overview of STC15W401AS series MCU
+5
+UART1/S1 can be switched in 3 groups of pins by selecting the control bits S1_S0 and S1_S1.S1 can be switched in 3 groups of pins by selecting the control bits S1_S0 and S1_S1.3 groups of pins by selecting the control bits S1_S0 and S1_S1.
+S1_S1 S1_S0 UART1/S1 can be switched between P1 and P3
+00 UART1/S1 on [P3.0/RxD,P3.1/TxD]
+01 UART1/S1 on [P3.6/RxD_2,P3.7/TxD_2]
+10 UART1/S1 on [P1.6/RxD_3/XTAL2,P1.7/TxD_3/XTAL1]
+when UAR
+T1 is on P1, please using internal R/C clock.
+1 1 Invalid
+Recommed UART1 on [P3.6/RxD_2, P3.7/TxD_2] or [P1.6/RxD_3/XTAL2, P1.7/TxD_3/XTAL1].
+CCP can be switched in 3 groups of pins by selecting the control bits CCP_S1 and CCP_S0.3 groups of pins by selecting the control bits CCP_S1 and CCP_S0.
+CCP_S1 CCP_S0 CCP can be switched in P1 and P3
+00 CCP on [P1.2/ECI,P1.1/CCP0,P1.0/CCP1,P3.7/CCP2]
+01 CCP on [P3.4/ECI_2,P3.5/CCP0_2,P3.6/CCP1_2,P3.7/CCP2_2]
+10 CCP on [P2.4/ECI_3,P2.5/CCP0_3,P2.6/CCP1_3,P2.7/CCP2_3]
+1 1 Invalid
+Mnemonic Add Name 7 6 5 4 3 2 1 0 Reset
+Value
+AUXR1
+P_SW1 A2H Auxiliary
+register 1 S1_S1 S1_S0 CCP_S1 CCP_S0 SPI_S1 SPI_S0 0 DPS 00x0,x00x
+CLK_DIV
+(PCON2) 97H Clock Division 
+register MCKO_S1 MCKO_S0 ADRJ Tx_Rx MCLKO_2 CLKS2 CLKS1 CLKS0 0000,0000
+SysClkO is the output of master 
+clock whose frequency can be 
+divided into SysClk/1,
+SysClk/2,/1, SysClk/2, , SysClk/2, 
+SysClk/4
+The master clock can either be 
+internal R/C clock or the external 
+input clock or the external crystal 
+oscillator
+. SysClk is the frequency 
+of master clock.
+Recommend UART1 on [P3.6/RxD_2, P3.7/TxD_2] 
+or [P1.6/RxD_3/XTAL2, P1.7/TxD_3/XTAL1]
+20
+19
+18
+17
+16
+15
+14
+13
+12
+11
+P3.5/T0CLKO/CCP0_2
+P3.1/TxD/T2
+P1.1/ADC1/CCP0CMPO/ECI/SS/ADC2/P1.2
+MOSI/ADC3/P1.3
+MISO/ADC4/P1.4
+Gnd
+SysClkO_2/XT
+AL2/RxD_3/ADC6/P1.6
+XTAL1/TxD_3/ADC7/P1.7
+SCLK/ADC5/P1.5
+CMP+/P5.5
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+P1.0/ADC0/CCP1
+CMP-/SysClkO/RST/P5.4
+Vcc
+P3.4/T0/ECI_2
+P3.3/INT1
+P3.2/INT0
+P3.0/RxD/INT4/T2CLKO
+P3.7/INT3/TxD_2/CCP2/CCP2_2
+P3.6/INT2/RxD_2/CCP1_2
+SOP20/DIP20/TSSOP20
+18 I/O ports
+SOP20/DIP20/TSSOP20
+16
+15
+14
+13
+12
+11
+10
+9
+1
+2
+3
+4
+5
+6
+7
+8
+CMPO/ECI/SS/ADC2/P1.2
+Vcc
+CMP+/P5.5
+Gnd
+CMP-/SysClkO/RST/P5.4
+SCLK/ADC5/P1.5
+MISO/ADC4/P1.4
+MOSI/ADC3/P1.3
+P3.3/INT1
+P3.2/INT0
+P3.1/TxD/T2
+P3.6/INT2/RxD_2/CCP1_2
+P3.7/INT3/TxD_2/CCP2/CCP2_2
+P1.0/ADC0/CCP1
+P1.1/ADC1/CCP0
+14 I/O ports
+SOP16/DIP16
+P3.0/RxD/INT4/T2CLKO
+SOP16/DIP16
+General Overview of STC15W401AS series MCU
+6
+SysCKO_S1 SysCKO_S0 the control bit of master clock output by dividing the frequency
+(The master clock can either be internal R/C clock or the external input clock or the external crystal oscillator)
+0 0 Master clock do not output external clock
+01 Master clock output external clock ˈbut its frequency do not be divided ˈand the output clock 
+frequency = SysClk / 1
+10 Master clock output external clock ˈbut its frequency is divided by 2 ˈand the output clock 
+frequency = SysClk / 2
+11 Master clock output external clock ˈbut its frequency is divided by 4 ˈand the output clock 
+frequency = SysClk / 4
+The master clock can either be internal R/C clock or the external input clock or the external crystal oscillator.
+SysClk is the frequency of master clock. 
+STC15W401AS series MCU output master clock on SysClkO/P5.4
+SysClkO_2˖to select Master Clock output on where
+         0˖Master Clock output on SysClkO/P5.4
+         1˖Master Clock output on SysClkO_2/XT
+AL2/P1.6
+The master clock can either be internal R/C clock or the external input clock or the external crystal oscillator.
+ADRJ˖the adjustment bit of ADC result
+        0˖ADC_RES[7:0] store high 8-bit ADC resultˈADC_RESL[1:0] store low 2-bit ADC result
+        1˖ADC_RES[1:0] store high 2-bit ADC resultˈADC_RESL[7:0] store low 8-bit ADC result
+Tx_Rx˖the set bit of relay and broadcast mode of UAR T1
+    0˖UART1 works on normal mode
+    1˖UART1 works on relay and broadcast modeˈthat to say output the input level state of  RxD port to the 
+outside TxD pin in real time, namely the external output of TxD pin can reflect the input level state of RxD 
+port.
+the RxD and 
+TxD of UART1 can be switched in 3 groups of pins: [RxD/P3.0, TxD/P3.1];
+          [RxD_2/P3.6, TxD_2/P3.7];
+          [RxD_3/P1.6, TxD_3/P1.7].
+SPI can be switched in 2 groups of pins by selecting the control bit SPI_S02 groups of pins by selecting the control bit SPI_S0 
+SPI_S1 SPI_S0 SPI can be switched in P1 and P2
+0 0 SPI on [P1.2/SS,P1.3/MOSI,P1.4/MISO,P1.5/SCLK]
+0 1 SPI on [P2.4/SS_2,P2.3/MOSI_2,P2.2/MISO_2,P2.1/SCLK_2]
+1
+0 SPI on [P5.4/SS_3,P4.0/MOSI_3,P4.1/MISO_3,P4.3/SCLK_3]
+1 1 Invalid
+Mnemonic Add Name 7 6 5 4 3 2 1 0 Reset
+Value
+AUXR1
+P_SW1 A2H Auxiliary
+register 1 S1_S1 S1_S0 CCP_S1CCP_S0 SPI_S1 SPI_S0 0 DPS 00x0,x00x
+CLK_DIV
+(PCON2) 97H Clock Division 
+register SysCKO_S1 SysCKO_S0 ADRJ Tx_Rx SysClkO_2 CLKS2 CLKS1 CLKS0 0000,0000
+General Overview of STC15W401AS series MCU
+7
+CLKS2 CLKS1 CLKS0
+the control bit of system clock 
+(System clock refers to the master clock that has been divided frequency, which is offered to 
+CPU, UARTs, SPI,  Timers, CCP/PWM/PCA and A/D Converter)
+0 0 0 Master clock frequency/1, No division
+0 0 1 Master clock frequency/2
+010 Master clock frequency/4
+0 1 1 Master clock frequency/8
+1 0 0 Master clock frequency/16
+1 0 1 Master clock frequency/32
+1 1 0 Master clock frequency/64
+111 Master clock frequency/128
+The master clock can either be internal R/C clock or the external input clock or the external crystal oscillator.
+Mnemonic Add Name 7 6 5 4 3 2 1 0 Reset Value
+CLK_DIV 
+(PCON2) 97H Clock Division 
+register MCKO_S1 MCKO_S0 ADRJ Tx_Rx MCLKO_2 CLKS2 CLKS1 CLKS0 0000,0000
+General Overview of STC15W401AS series MCU
+8
+To provide customized IC services
+Conclusion : STC15W401AS series MCU have: Two16-bit relaodable Timers/Counters that are Timer/Counter 0 and Timer/
+Counter 2; 3 channels CCP/PWM/PCA
+ (can achieve 3 timers or 3 D/A converters again); special power-down 
+wake-up timer; 5 external interrupts INT0/INT1/INT2/INT3/INT4;  a high-speed asynchronous serial port ---- 
+UART;  a high-speed synchronous serial peripheral interface ---- SPI; 8 channels and 10 bits high-speed A/D 
+converter; 1 Comparator; 1 data pointers ---- DPTR.
+Because the last 7 bytes of the program area is stored mandatorily the 
+contents of only global ID, the program space the user can actually 
+use is 7 bytes smaller than the space shown in the selection table.
+4.  STC15W401AS series Selection and Price Table
+Type
+1T 8051 
+MCU
+Operating  
+V oltage 
+(V)
+Flash
+(byte)
+SRAM
+(byte)
+U
+A
+R
+T
+S
+P
+I
+common
+Timers
+T0/T2
+CCP
+PCA
+PWM
+Speical
+Power-
+down
+Wake-up 
+Timer
+Standard
+External
+Interrupts
+A/D
+8-channel
+C
+O
+M
+P
+A
+R
+A
+T
+O
+R
+D
+P
+T
+R
+EEP 
+ROM
+Internal
+Low-
+V oltage 
+Detection
+Interrupt
+W
+D
+T
+Internal
+High-
+reliable
+Reset
+(with
+optional
+threshold
+voltage)
+Internal
+High-
+Precise
+Clock
+Output
+clock
+and
+reset
+signal
+from
+MCU
+Encryption
+Download
+(to protect 
+your code 
+from being 
+intercepted)
+RS485
+Control
+All Packages
+SOP28/TSSOP28/
+SKDIP28/QFN28
+SOP20 / DIP20 / 
+TSSOP20
+SOP16 / DIP16
+Price of a part of 
+packages(RMB ¥)
+SOP16 SOP20 SOP28
+STC15W401AS series MCU Selection and Price Table
+Note: 3 channels CCP/PCA/PWM also can be used as 3 Timers.
+STC15W401AS 2.4-5.5 1K 512 1 Y 2 3-ch Y 5 10-bit Y 1 5K Y Y 16-level Y Y Y Y
+STC15W402AS 2.4-5.5 2K 512 1 Y 2 3-ch Y 5 10-bit Y 1 5K Y Y 16-level Y Y Y Y
+STC15W404AS 2.5-5.5 4K 512 1 Y 2 3-ch Y 5 10-bit Y 1 9K Y Y 16-level Y Y Y Y
+STC15W408AS 2.5-5.5 8K 512 1 Y 2 3-ch Y 5 10-bit Y 1 5K Y Y 16-level Y Y Y Y
+IAP15W413AS 2.5-5.5 13K 512 1 Y 2 3-ch Y 5 10-bit Y 1 IAP Y Y 16-level Y Y Y Y The program Flash in 
+user program area can  
+be used as EEPROM.
+IRC15W415AS
+(Using external 
+crystal or internal 
+24MHz clock)
+2.5-5.5 15.5K 512 1 Y 2 3-ch Y 5 10-bit Y 1 IAP Y Y Fixed Y Y N N The program Flash in 
+user program area can  
+be used as EEPROM.
+Encryption Download : please burn source code with encryption key onto MCU in the factory. Then, you can make a simple 
+update software just with one "update" button  by fisrtly using the fuction "encrytion download" and 
+then "release project" to update yourself code unabled to be intercepted when you need to upgrade your 
+code.
+5.  STC15W401AS series Package and Price Table
+Type
+1T 8051 
+MCU
+Operating  
+V oltage 
+(V)
+Operating  
+Frequency
+(MHz)
+Operating
+Temprature 
+(I — Industrial)
+All Packages Price( RMB ¥)
+SOP28/ TSSOP28/ SKDIP28/ QFN28/ SOP20/ DIP20/ TSSOP20/ SOP16/ DIP16
+SOP28 TSSOP28 SKDIP28 QFN28 SOP20 TSSOP20 DIP20 SOP16 DIP16
+STC15W401AS series MCU Package and Price Table
+STC15W401AS 2.5-5.5 35 -40 ć ~ +85ć
+STC15W402AS 2.5-5.5 35 -40 ć ~ +85ć
+STC15W404AS 2.5-5.5 35 -40 ć ~ +85ć
+STC15W401AS 2.5-5.5 35 -40 ć ~ +85ć
+IAP15W413AS 2.5-5.5 35 -40 ć ~ +85ć
+IRC15W415AS 2.5-5.5 35 -40 ć ~ +85ć
+General Overview of STC15W401AS series MCU
+9
+STC     MCU    Limited.
+6.  Naming rules of rules of STC15W401AS series  MCU 
+xxx 15 x    4  xx        xx    --      35      x    -    xxxxx      xx
+Pin Number
+e.g.28, 20,16
+Package type
+e.g. SOP, SKDIP, DIP, TSSOP, QFN
+Operating frequency
+35 : Up to 35MHz
+AS˖1 UARTs (can be used  simultaneously)ˈ
+          SPIˈ
+          Internal EEPROMˈ
+          A/D Converter(PWM also can be used as DAC)ˈ
+         CCP/PWM/PCA   
+Program space, e.g.
+04:4KB   08:8KB  10:10KB  12:12KB  13:13KB   15:15.5KB etc.
+SRAM: 128×4 = 512 E\WHV
+Operating V oltage
+W : 5.5V ~ 2.5V
+STC :  The program Flash in user program area can not be used as EEPROM., but there 
+are special EEPROM.
+IAP :   The program Flash in user program area can be used as EEPROM.
+IRC :   The program Flash in user program area can be used as EEPROM, and to use 
+external crystal or internal 24MHz clock
+STC 1T 8051 MCU,
+Speed is 8~12 times faster than the traditional 8051 in the same working frequency
+Temperature range
+I : Industrial, -40ć-85ć
+C : Commercial, 0ć-70ć
+*HQHUDO2YHUYLHZRI67&:$6VHULHV0&8
+
+7.  Application Circuit Diagram for ISP of STC15W401AS series MCU
+This part of the circuit 
+has nothing to do with 
+the ISP downloads
+System Power
+(can be from USB port of PC)
+7.1  Application Circuit Diagram for ISP using RS-232 Converter
+3
+2
+1
+1
+2
+3
+4
+5
+6
+7
+8
+16
+15
+14
+13
+12
+11
+10
+9
+     Vcc
+     Gnd
+T1OUT
+  R1IN
+R1OUT
+  T1IN
+  T2IN
+R2OUT
+C1+
+V+
+C1-
+C2+
+C2-
+V-
+T2OUT
+R2IN
+0.1μF
+Vcc
+Vcc
+Gnd
+PC_RxD(COM Pin2)
+PC_TxD(COM Pin3)
+2
+3
+5
+10K
+STC3232,STC232,MAX232,SP232 PC COM
+Vcc
+MCU_RxD(P3.0)
+MCU_TxD(P3.1)
+10K
+18
+17
+16
+15
+14
+13
+12
+11
+4
+5
+6
+7
+8
+9
+10
+CCP0/ADC1/P1.1P1.2/ADC2/SS/ECI/CMPO
+Vcc
+P5.5/CMP+
+Gnd
+P5.4/RST/SysClkO/CMP-
+CCP1/ADC0/P1.0
+P1.5/ADC5/SCLK
+P1.4/ADC4/MISO
+P1.3/ADC3/MOSI
+INT1/P3.3
+INT0/P3.2
+T2/TxD/P3.1
+CCP1_2/RxD_2/INT2/P3.6
+CCP2_2/CCP2/TxD_2/INT3/P3.7
+T2CLKO/INT4/RxD/P3.0
+P1.6/ADC6/RxD_3/XTAL2/SysClkO_2
+P1.7/ADC7/TxD_3/XTAL1
+19
+20
+ECI_2/T0/P3.4
+CCP0_2/T0CLKO/P3.5
++10μF
+0.1μF
+0.1μF
+0.1μF
+Vin
+SW1
+Power On
+47μF 0.1μF
+Vcc
+C1 C2
+Internal hghly reliable Reset, External reset circuit can be completely removed.
+P5.4/RST/MCLKO pin factory defaults to the I/O port, which can be set as RST reset pin(active high) through the 
+STC-ISP programmer.
+Internal high-precise R/C clock( ±3% ), ±1% temperature drift (-40ć~+85ć) while ±0.6% in normal temperature
+(-20ć~+65ć). External expensive crysal can be completely removed.
+Recommend to add decoupling capacitor C1(47μF) and C2(0.1μF)  between Vcc and Gnd that can remove power 
+noise and improve the anti-interference ability.
+Circuit diagram for ISP of STC MCUSTC RS-232 Converter
+Please power on the target MCU after press 
+down the button "Download/Program" on
+ 
+STC-ISP.exe when burning code to MCU.
+the line width 
+may be only 
+30 ~ 50mil
+the line width 
+may be only 
+100 ~ 200mil
+General Overview of STC15W401AS series MCU
+11
+300Ω
+1
+2
+3
+4
+28
+27
+26
+25
+VO_33
+VDD_5
+DM
+DP
+GND
+TxD
+VDD_325
+RxD
+PL-2303SA
+SOP8
+VO_3.3V
+D-
+D+
+1
+2
+3
+4
+USB +5V
+5
+USB-Micro
+27Ω
+27Ω
+1.5K     
+VO_3.3V
+0.1μF0.1μF 10μF
+10K
+Vcc
+10K
+18
+17
+16
+15
+14
+13
+12
+11
+CCP0/ADC1/P1.1
+CCP1/ADC0/P1.0
+INT1/P3.3
+INT0/P3.2
+T2/TxD/P3.1
+CCP1_2/RxD_2/INT2/P3.6
+CCP2_2/CCP2/TxD_2/INT3/P3.7
+T2CLKO/INT4/RxD/P3.0
+19
+20
+ECI_2/T0/P3.4
+CCP0_2/T0CLKO/P3.5
+3
+2
+1
+4
+5
+6
+7
+8
+9
+10
+P1.2/ADC2/SS/ECI/CMPO
+Vcc
+P5.5/CMP+
+Gnd
+P5.4/RST/SysClkO/CMP-
+P1.5/ADC5/SCLK
+P1.4/ADC4/MISO
+P1.3/ADC3/MOSI
+P1.6/ADC6/RxD_3/XT
+AL2/SysClkO_2
+P1.7/ADC7/TxD_3/XTAL1
+Vin
+Power On
+47μF 0.01μF
+Vcc
+C1 C2
+Internal hghly reliable Reset, External reset circuit can be completely removed.
+P5.4/RST/MCLKO pin factory defaults to the I/O port, which can be set as RST reset pin(active high) through the 
+STC-ISP programmer.
+Internal high-precise R/C clock( ±3% ), ±1% temperature drift (-40ć~+85ć) while ±0.6% in normal temperature
+(-20ć~+65ć). External expensive crysal can be completely removed.
+Recommend to add decoupling capacitor C1(47μF) and C2(0.1μF)  between Vcc and Gnd that can remove power 
+noise and improve the anti-interference ability.
+7.2  Application Circuit Diagram for ISP using USB Chip PL-2303SA to convert Serial Port 
+the line width 
+may be only 
+30 ~ 50mil
+the line width may be 
+only 100 ~ 200mil
+System Power/USB +5V 
+(from USB port of PC)
+Please power on the target MCU after press 
+down the button "Download/Program" on 
+STC-ISP.exe when burning code to MCU.
+This part of the circuit 
+has nothing to do with 
+the ISP downloads
+The resistor and diode are to avoid 
+USB device to power the target MCU
+Circuit diagram for ISP of STC MCU
+USB convert Serial Port
+Isolated Diode1N5817/1N5819 (RMB ˇ0.028 )
+General Overview of STC15W401AS series MCU
+12
+300Ω
+1
+2
+3
+4
+5
+6
+7
+8
+28
+27
+26
+25
+24
+23
+22
+RSERVED
+NC
+TEST 
+GND
+NC
+GP1
+GP0
+NC
+VDD_5
+RESET_N
+GND
+VO_33
+DM
+DP
+TxD
+DTR_N
+RTS_N
+VDD_325
+RxD
+RI_N
+GND
+NC
+DSR_N
+DCD_N
+CTS_N
+SHTD_N
+GP2
+GP3
+9
+10
+11
+12
+13
+14
+21
+20
+19
+18
+17
+16
+15
+D-
+D+
+1
+2
+3
+4
+USB +5V
+5
+USB-Micro
+PL-2303HXD-SSOP28
+PL-2303HX-SSOP28
+1.5K     
+VO_3.3V
+4.7K
+27Ω
+27Ω
+VO_3.3V
+0.1μF
+0.1μF 10μF
+USB +5V
+12MHz     
+22pF
+22pFVO_3.3V
+10K
+10K
+Vcc
+10K
+18
+17
+16
+15
+14
+13
+12
+11
+CCP0/ADC1/P1.1
+CCP1/ADC0/P1.0
+INT1/P3.3
+INT0/P3.2
+T2/TxD/P3.1
+CCP1_2/RxD_2/INT2/P3.6
+CCP2_2/CCP2/TxD_2/INT3/P3.7
+T2CLKO/INT4/RxD/P3.0
+19
+20
+ECI_2/T0/P3.4
+CCP0_2/T0CLKO/P3.5
+3
+2
+1
+4
+5
+6
+7
+8
+9
+10
+P1.2/ADC2/SS/ECI/CMPO
+Vcc
+P5.5/CMP+
+Gnd
+P5.4/RST/SysClkO/CMP-
+P1.5/ADC5/SCLK
+P1.4/ADC4/MISO
+P1.3/ADC3/MOSI
+P1.6/ADC6/RxD_3/XT
+AL2/SysClkO_2
+P1.7/ADC7/TxD_3/XTAL1
+Vin
+Power On
+47μF 0.01μF
+Vcc
+C1 C2
+Internal hghly reliable Reset, External reset circuit can be completely removed.
+P5.4/RST/MCLKO pin factory defaults to the I/O port, which can be set as RST reset pin(active high) through the 
+STC-ISP programmer.
+Internal high-precise R/C clock( ±3% ), ±1% temperature drift (-40ć~+85ć) while ±0.6% in normal temperature
+(-20ć~+65ć). External expensive crysal can be completely removed.
+Recommend to add decoupling capacitor C1(47μF) and C2(0.1μF)  between Vcc and Gnd that can remove power 
+noise and improve the anti-interference ability.
+the line width 
+may be only 
+30 ~ 50mil
+the line width may be 
+only 100 ~ 200mil
+System Power/USB +5V 
+(from USB port of PC)
+Please power on the target MCU after press 
+down the button "Download/Program" on 
+STC-ISP.exe when burning code to MCU.
+The resistor and diode are to avoid 
+USB device to power the target MCU
+This part of the circuit 
+has nothing to do with 
+the ISP downloads
+Circuit diagram for ISP of STC MCU
+USB convert Serial Port
+Isolated Diode1N5817/1N5819 (RMB ˇ0.028 )
+7.3  Application Circuit Diagram for ISP using USB Chip PL-2303HXD / PL-2303HX to convert Serial Port 
+General Overview of STC15W401AS series MCU
+13
+STC     MCU    Limited.
+MNEMONIC
+Pin Number 
+DESCRIPTIONSOP28
+TSSOP28
+SKDIP28
+QFN28
+SOP20
+DIP20
+TSSOP20
+SOP16
+DIP16
+P1.0/ADC0/
+CCP1 32 7 1 9 1 5
+P1.0 common I/O port PORT1[0]
+ADC0 ADC input channel-0
+CCP1
+Capture of external signal(measure frequency or be used 
+as external interrupts)ǃhigh-speed Pulse and Pulse-
+Width Modulation output channel-1
+P1.1/ADC1/
+CCP0 42 8 2 0 1 6
+P1.1 common I/O port PORT1[1]
+ADC1 ADC input channel-1
+CCP0
+Capture of external signal(measure frequency or be used 
+as external interrupts)ǃhigh-speed Pulse and Pulse-
+Width Modulation output channel-0
+P1.2/ADC2/SS/
+ECI/CMPO 5111
+P1.2 common I/O port PORT1[2]
+ADC2 ADC input channel-2
+SS Slave selection signal of synchronous serial peripheral 
+interface----SPI
+ECI External pulse input pin of CCP/PCA counter
+CMPO The output port of reslut compared by comparator
+P1.3/ADC3/
+MOSI 6222
+P1.3 common I/O port PORT1[3]
+ADC3 ADC input channel-3
+MOSI Master Output Slave Input of SPI
+P1.4/ADC4/
+MISO 7333
+P1.4 common I/O port PORT1[4]
+ADC4 ADC input channel-4
+MISO Master Iutput Slave Onput of SPI
+P1.5/ADC5/
+SCLK 8444
+P1.5 common I/O port PORT1[5]
+ADC5 ADC input channel-5
+SCLK Clock Signal of  synchronous serial peripheral interface-
+---SPI
+P1.6/ADC6/
+RxD_3/XTAL2/
+SysClkO_2
+955
+P1.6 common I/O port PORT1[6]
+ADC6 ADC input channel-6
+RxD_3 Receive Data Port of UART
+XTAL2
+Output from the inverting amplifier of internal clock 
+circuit. This pin should be floated when an external 
+oscillator is used.
+SysClkO_2
+Master clock output; the output frequency can be 
+SysClk/1, SysClk/2 and SysClk/4.
+The master clock can either be internal R/C clock or the 
+external input clock or the external crystal oscillator.
+P1.7/ADC7/
+TxD_3/XTAL1 10 6 6
+P1.7 common I/O port PORT1[7]
+ADC7 ADC input channel-7
+TxD_3 Transit Data Port of UART
+XTAL1
+Input to the inverting oscillator amplifier of internal 
+clock circuit. Receives the external oscillator signal 
+when an external oscillator is used.
+8.  Pin Descriptions of STC15W401AS series MCU
+General Overview of STC15W401AS series MCU
+14
+STC    MCU    Limited.
+MNEMONIC
+Pin Number
+DESCRIPTIONSOP28
+TSSOP28
+SKDIP28
+QFN28
+SOP20
+DIP20
+TSSOP20
+SOP16
+DIP16
+P2.0/
+RSTOUT_LOW 23 19
+P2.0 common I/O port PORT2[0]
+RSTOUT_LOW the pin output low after power-on and during reset, 
+which can be set to output high by software
+P2.1/SCLK_2 24 20
+P2.1 common I/O port PORT2[1]
+SCLK_2 Clock Signal of  synchronous serial peripheral 
+interface----SPI
+P2.2/MISO_2 25 21 P2.2 common I/O port PORT2[2]
+MISO_2 Master Iutput Slave Onput of SPI
+P2.3/MOSI_2 26 22 P2.3 common I/O port PORT2[3]
+MOSI_2 Master Output Slave Input of SPI
+P2.4/ECI_3/SS_2 27 23
+P2.4 common I/O port PORT2[4]
+ECI_3 External pulse input pin of CCP/PCA counter
+SS_2 Slave selection signal of synchronous serial 
+peripheral interface----SPI
+P2.5/CCP0_3 28 24
+P2.5 common I/O port PORT2[5]
+CCP0_3
+Capture of external signal(measure frequency or be 
+used as external interrupts)ǃhigh-speed Pulse and 
+Pulse-Width Modulation output channel-0
+P2.6/CCP1_3 1 25
+P2.6 common I/O port PORT2[6]
+CCP1_3
+Capture of external signal(measure frequency or be 
+used as external interrupts)ǃhigh-speed Pulse and 
+Pulse-Width Modulation output channel-1
+P2.7/CCP2_3 2 26
+P2.7 common I/O port PORT2[7]
+CCP2_3
+Capture of external signal(measure frequency or be 
+used as external interrupts)ǃhigh-speed Pulse and 
+Pulse-Width Modulation output channel-2
+P3.0/RxD/INT4
+/T2CLKO 15 11 11 9
+P3.0 common I/O port PORT3[0]
+RxD Receive Data Port of UART1
+INT4
+External interrupt 4, which only can be generated 
+on falling edge.
+/INT4 supports power-down waking-up
+T2CLKO
+T2 Clock Output
+The pin can be configured for T2CLKO by setting 
+INT_CLKO[2] bit /T2CLKO 
+P3.1/TxD/T2 16 12 12 10
+P3.1 common I/O port PORT3[1]
+TxD Transit Data Port of UART1
+T2 External input of Timer/Counter 2
+P3.2/INT0 17 13 13 11
+P3.2 common I/O port PORT3[2]
+INT0
+External interrupt 0, which both can be generated 
+on rising and falling edge.
+INT0 only can generate interrupt on falling edge 
+if IT0 (TCON.0) is set to 1. And, INT0 both can 
+generate interrupt on rising and falling edge if IT0 
+(TCON.0) is set to 0.
+General Overview of STC15W401AS series MCU
+15
+MNEMONIC
+Pin Number 
+DESCRIPTIONSOP28
+TSSOP28
+SKDIP28
+QFN28
+SOP20
+DIP20
+TSSOP20
+SOP16
+DIP16
+P3.3/INT1 18 14 14 12
+P3.3 common I/O port PORT3[3]
+INT1
+External interrupt 1, which both can be generated on rising 
+and falling edge.
+INT1 only can generate interrupt on falling edge if IT1 
+(TCON.2) is set to 1. And, INT1 both can generate interrupt 
+on rising and falling edge if IT1 (TCON.2) is set to 0.
+INT1 supports power-down waking-up
+P3.4/T0/ECI_2 19 15 15
+P3.4 common I/O port PORT3[4]
+T0 External input of Timer/Counter 0
+ECI_2 External pulse input pin of CCP/PCA counter
+P3.5/T0CLKO/
+CCP0_2 20 16 16
+P3.5 common I/O port PORT3[5]
+T0CLKO
+T0 Clock Output
+The pin can be configured for T0CLKO by setting 
+INT_CLKO[0] bit /T0CLKO 
+CCP0_2
+Capture of external signal(measure frequency or be used 
+as external interrupts)ǃhigh-speed Pulse and Pulse-Width 
+Modulation output channel-0
+P3.6/INT2/RxD_2
+/CCP1_2 21 17 17 13
+P3.6 common I/O port PORT3[6]
+INT2
+External interrupt 2, which only can be generated on falling 
+edge.
+/INT2 supports power-down waking-up
+RxD_2 Receive Data Port of UART1
+CCP1_2
+Capture of external signal(measure frequency or be used 
+as external interrupts)ǃhigh-speed Pulse and Pulse-Width 
+Modulation output channel-1
+P3.7/INT3/TxD_2/
+CCP2/CCP2_2 22 18 18 14
+P3.7 common I/O port PORT3[7]
+INT3
+External interrupt 3, which only can be generated on falling 
+edge.
+INT3 supports power-down waking-up
+TxD_2 Transit Data Port of UART
+CCP2
+Capture of external signal(measure frequency or be used 
+as external interrupts)ǃhigh-speed Pulse and Pulse-Width 
+Modulation output channel-2
+CCP2_2
+Capture of external signal(measure frequency or be used 
+as external interrupts)ǃhigh-speed Pulse and Pulse-Width 
+Modulation output channel-2
+P5.4/RST/
+SysClkO/CMP- 11 7 7 5
+P5.4 common I/O port PORT5[4]
+RST
+Reset pin. 
+A high on this pin for at least two machine cycles will reset 
+the device. 
+SysClkO
+Master clock output; the output frequency can be SysClk/1, 
+SysClk/2 and SysClk/4.
+The master clock can either be internal R/C clock or the 
+external input clock or the external crystal oscillator
+.
+CMP- Comparator negative input
+P5.5/CMP+
+13 9 9 7 P5.5 common I/O port PORT5[5]
+CMP+ Comparator positive input
+Vcc 12 8 8 6 The positive pole of power
+Gnd 14 10 10 8 The negative pole of power, Gound
+General Overview of STC15W401AS series MCU
+16
