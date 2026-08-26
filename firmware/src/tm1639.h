@@ -16,5 +16,6 @@ void tm1639_write_display(const unsigned char data[8]);
 void tm1639_set_brightness(unsigned char level); /* 0..7 */
 
 extern const unsigned char seg_font[16]; /* 共阴 0-9, A-F */
+unsigned char seg_rotate180(unsigned char d); /* 倒装管段码旋转 180° */
 
 #endif

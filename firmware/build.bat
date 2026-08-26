@@ -1,8 +1,9 @@
 @echo off
 chcp 936 >nul
+cd /d %~dp0
 setlocal
 REM Build firmware for STC15W408AS with SDCC (https://sdcc.sourceforge.net)
-REM SDCC ÒÑ×°ÔÚ C:\Program Files\SDCC\bin£»²»´æÔÚÊ±»ØÍËµ½ PATH¡£
+REM SDCC ï¿½ï¿½×°ï¿½ï¿½ C:\Program Files\SDCC\binï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ëµï¿½ PATHï¿½ï¿½
 set SDCC_BIN=C:\Program Files\SDCC\bin
 if exist "%SDCC_BIN%\sdcc.exe" set "PATH=%SDCC_BIN%;%PATH%"
 if not exist out mkdir out
