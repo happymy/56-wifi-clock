@@ -2,6 +2,52 @@
 #include "ds1302.h"
 #include "stc15.h"
 
+/* 硬件串口：UART1 经 P3.1(TXD) 输出，9600 8N1，内部 IRC 11.063MHz。
+   STC15W408AS 无 Timer1，波特源必须用 Timer2。重装值公式 = 65536 - FOSC/4/BAUD。 */
+static void uart_init(void) {
+    P3M1 &= ~0x02; P3M0 |= 0x02;   /* P3.1 推挽输出(否则驱动不出 TX 电平) */
+    SCON  = 0x50;                  /* 模式1、8N1、REN=1 */
+    /* 11063MHz/4/9600 = 288 -> 重装值 65536-288 = 65248 = 0xFEE0 -> 实测 9603bps */
+    T2L = 0xE0;
+    T2H = 0xFE;
+    AUXR  = 0x14;                  /* Timer2 1T 模式 + 启动 Timer2(bit4 BRTR) */
+    AUXR |= 0x01;                  /* bit0 S1BRS=1：选 Timer2 作 UART1 波特源 */
+}
+static void uart_putc(unsigned char c) {
+    unsigned int w = 0;
+    SBUF = c;
+    while (!(SCON & 0x02)) { if (++w >= 30000) break; }  /* 波特时钟异常时防死等 */
+    SCON &= ~0x02;                    /* 清 TI */
+}
+static void uart_str(const char *s) { while (*s) uart_putc((unsigned char)*s++); }
+static void uart_hex(unsigned char v) {
+    static const char HEX[] = "0123456789ABCDEF";
+    uart_putc((unsigned char)HEX[v >> 4]);
+    uart_putc((unsigned char)HEX[v & 0x0F]);
+}
+static void uart_u8(unsigned char v) {        /* 十进制 0..255 */
+    unsigned char buf[3]; unsigned char i = 0;
+    if (v == 0) { uart_putc('0'); return; }
+    while (v) { buf[i++] = (unsigned char)('0' + v % 10); v /= 10; }
+    while (i) uart_putc(buf[--i]);
+}
+static void dbg_time(const char *tag, const ds_time *t) {
+    uart_str(tag);
+    uart_str(" raw=sec:"); uart_hex(t->sec); uart_str(" min:"); uart_hex(t->min);
+    uart_str(" hr:"); uart_hex(t->hr); uart_str(" date:"); uart_hex(t->date);
+    uart_str(" mon:"); uart_hex(t->month); uart_str(" wd:"); uart_hex(t->weekday);
+    uart_str(" yr:"); uart_hex(t->year);
+    uart_str("  CH="); uart_putc((t->sec & 0x80) ? '1' : '0');
+    uart_str("  time=");
+    uart_u8((unsigned char)((t->hr   >> 4) * 10 + (t->hr   & 0x0F))); uart_putc(':');
+    uart_u8((unsigned char)((t->min  >> 4) * 10 + (t->min  & 0x0F))); uart_putc(':');
+    uart_u8((unsigned char)((t->sec  >> 4) * 10 + (t->sec  & 0x0F)));
+    uart_putc(' ');
+    uart_u8((unsigned char)((t->date >> 4) * 10 + (t->date & 0x0F)));
+    uart_putc('/'); uart_u8(t->month); uart_putc('/'); uart_u8(t->year);
+    uart_str("\r\n");
+}
+
 /* BEEP(P2.1) 经 S9012 PNP 三极管驱动蜂鸣器：拉低=导通响，拉高=截止静音(active-low) */
 #define BEEP_ON()   do { P2 &= ~0x02; } while (0)
 #define BEEP_OFF()  do { P2 |= 0x02; } while (0)
@@ -61,8 +107,12 @@ void main(void) {
     P3M1 &= ~0x0C; P3M0 &= ~0x0C; /* P3.2/3.3 准双向(按键输入) */
     P1 &= ~0x04;                 /* LED_T 红：运行指示 */
 
+    uart_init();
+    uart_str("boot\r\n");
+
     tm1639_init();
     ds1302_init();               /* 若停振则写入默认时间并启动走时 */
+    { ds_time t0; ds1302_read_time(&t0); dbg_time("init", &t0); }
 
     while (1) {
         unsigned char up, set;
@@ -91,6 +141,22 @@ void main(void) {
             ds1302_write_time(&t);
         }
         prev_up = up;
+
+        { static unsigned int dbg_tick = 0;
+          dbg_tick += 20;
+          if (dbg_tick >= 250) {
+              dbg_tick = 0;
+              dbg_time("loop", &t);
+              uart_str(" up="); uart_putc(up ? '1' : '0');
+              uart_str(" set="); uart_putc(set ? '1' : '0');
+              uart_str(" disp=");
+              uart_hex(disp[0]); uart_putc(' '); uart_hex(disp[1]); uart_putc(' ');
+              uart_hex(disp[2]); uart_putc(' '); uart_hex(disp[3]); uart_putc(' ');
+              uart_hex(disp[4]); uart_putc(' '); uart_hex(disp[5]); uart_putc(' ');
+              uart_hex(disp[6]); uart_putc(' '); uart_hex(disp[7]);
+              uart_str("\r\n");
+          }
+        }
 
         delay_ms(20);
     }
