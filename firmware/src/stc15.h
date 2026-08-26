@@ -20,6 +20,8 @@ __SFR(P1M1, 0x91);
 __SFR(P1M0, 0x92);
 __SFR(P2M1, 0x95);
 __SFR(P2M0, 0x96);
+__SFR(P3M1, 0xB1);
+__SFR(P3M0, 0xB2);
 
 /* ADC（STC15W408AS，10 位） */
 __SFR(P1ASF, 0x9D);    /* P1 模拟功能选择（只写） */
