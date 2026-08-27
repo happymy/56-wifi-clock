@@ -101,7 +101,7 @@ void ds1302_read_time(ds_time *t) {
 
 void ds1302_write_time(const ds_time *t) {
     ds_write_byte(0x8E, 0x00);   /* 解除写保护 */
-    ds_write_byte(0x80, t->sec);
+    ds_write_byte(0x80, t->sec & 0x7F);  /* 清 CH 位，确保手动设置后恢复走时 */
     ds_write_byte(0x82, t->min);
     ds_write_byte(0x84, t->hr);
     ds_write_byte(0x86, t->date);
