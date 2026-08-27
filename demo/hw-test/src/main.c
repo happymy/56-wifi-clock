@@ -5,10 +5,10 @@
 /* 硬件生产测试固件：逐项验证整板功能，用于排查虚焊/漏焊。
    被排除项：ESP-01S 为成品模块，不测；其串口(UART1)改用 P3.0<->P3.1 回环自测。
    测试项与对应引脚：
-     T1 显示自检  -> TM1639(P2.3/2.4/2.5) 全段点亮，肉眼查每管每段
-     T2 实时时钟  -> DS1302(P1.3/1.4/1.5) 起振+走时
-     T3 串口回环  -> UART1(P3.0/3.1) 短接后自发自收
-     T4 按键      -> UP(P3.2)/SET(P3.3) 实测按下
+      T1 显示自检  -> TM1639(P2.3/2.4/2.5) 全段点亮，肉眼查每管每段
+      T2 实时时钟  -> DS1302(P1.3/1.4/1.5) 主屏 HH:MM + SMG1 SS 走时，判秒前进
+      T3 串口回环  -> UART1(P3.0/3.1) 左发右显 00..FF 回环，末显 HP
+      T4 按键      -> SET(P3.3) 加高位、UP(P3.2) 加低位计数器
      T5 蜂鸣器    -> BEEP(P2.1) 发声(人耳确认)
      T6 状态灯    -> LED_T(P1.2) 闪烁(肉眼确认)
      T7 光敏      -> GM(P1.0) ADC 未悬空/未短接
@@ -16,7 +16,7 @@
      T9 EEPROM    -> IAP 擦/写读回末扇区(连通性/虚焊，不遍历不测寿命)
      T10 断电保持 -> DS1302+CR1220(看 g_boot_action；手动切电核对，置最后)
     结果：自动判定项(T2/T3/T4/T7/T8/T9)失败置位 g_fail；T1/T5/T6 由产线员肉眼确认。
-   显示：大屏(GRID1-4)显示当前测试号；全过显「0」、有失败显「E」。串口打印明细。 */
+    显示：SMG2(上排2位)常驻步骤号01~10；主屏(GRID1-4)/SMG1 显示该项内容或结果(0=过 E=败)，确认步骤闪烁提示。串口仅打印 ASCII 明细(防乱码)。 */
 
 #define BIT(n) (1u << (n))
 #define T_DISP 0
@@ -58,14 +58,6 @@ static void uart_u8(unsigned char v) {
     while (v) { buf[i++] = (unsigned char)('0' + v % 10); v /= 10; }
     while (i) uart_putc(buf[--i]);
 }
-/* 打印 BCD 时间 HH:MM:SS（供手动断电保持核对） */
-static void dbg_time(const ds_time *t) {
-    unsigned char h = (unsigned char)((t->hr >> 4) * 10 + (t->hr & 0x0F));
-    unsigned char m = (unsigned char)((t->min >> 4) * 10 + (t->min & 0x0F));
-    unsigned char s = (unsigned char)((t->sec & 0x7F) >> 4) * 10 + (t->sec & 0x0F);
-    uart_u8(h); uart_putc(':'); uart_u8(m); uart_putc(':'); uart_u8(s);
-}
-
 /* ---------- 基础外设 ---------- */
 #define BEEP_ON()  do { P2 &= ~0x02; } while (0)
 #define BEEP_OFF() do { P2 |= 0x02; } while (0)
@@ -87,26 +79,55 @@ static unsigned int adc_read(unsigned char ch) {
     return ((unsigned int)ADC_RES << 2) | (ADC_RESL & 0x03);
 }
 
-/* 等待某键(P3 位为低=按下)最多 ms 毫秒，期间驱动显示刷屏；按下返回 1，超时返回 0 */
-static unsigned char key_wait(unsigned char p3bit, unsigned int ms, unsigned char disp[8]) {
-    unsigned int t = 0;
-    while (t < ms) {
-        tm1639_write_display(disp);
-        if (!(P3 & p3bit)) return 1;
-        delay_ms(10); t += 10;
-    }
-    return 0;
-}
+/* key_wait 已由 confirm_wait / blink_wait 取代 */
 
 static unsigned char both_keys(void) { return (!(P3 & 0x04) && !(P3 & 0x08)); }
 
 /* ---------- 显示辅助 ---------- */
-static void show_stage(unsigned char disp[8], unsigned char n) {
-    disp[0] = seg_font[n / 10];
-    disp[1] = seg_font[n % 10];
-    disp[2] = seg_rotate180(seg_font[n / 10]);
-    disp[3] = seg_font[n % 10];
-    disp[4] = disp[5] = disp[6] = disp[7] = 0;
+/* 十六进制段码（0-F），用于 T3 左发右显 */
+static const unsigned char SEG_HEX[16] = {
+    0x3F,0x06,0x5B,0x4F,0x66,0x6D,0x7D,0x07,0x7F,0x6F, /*0-9*/
+    0x77,0x7C,0x39,0x7E,0x79,0x71                          /*A-F*/
+};
+/* 步骤号常驻 SMG2(上排2位)，让产线员不看串口也知道测到哪一项 */
+static void disp_step(unsigned char disp[8], unsigned char n) {
+    disp[6] = seg_font[n / 10];
+    disp[7] = seg_font[n % 10];
+}
+static void clear_main(unsigned char disp[8]) {
+    unsigned char i;
+    for (i = 0; i < 6; i++) disp[i] = 0;   /* 清主4位+SMG1，保留 SMG2 步骤号 */
+}
+/* 主4位显示无符号整数(0-1023) */
+static void disp_u16(unsigned char disp[8], unsigned int val) {
+    disp[0] = seg_font[val / 1000];
+    disp[1] = seg_font[(val / 100) % 10];
+    disp[2] = seg_font[(val / 10) % 10];
+    disp[3] = seg_font[val % 10];
+}
+/* 4 位计数器：高2位 hi(0-99) + 低2位 lo(0-99)，用于 T4 */
+static void disp_hilo(unsigned char disp[8], unsigned char hi, unsigned char lo) {
+    disp[0] = seg_font[hi / 10]; disp[1] = seg_font[hi % 10];
+    disp[2] = seg_font[lo / 10]; disp[3] = seg_font[lo % 10];
+}
+/* 单步结果闪现：主4位+SMG1 显 0(过)/E(败)，SMG2 保留步骤号 */
+static void flash_step(unsigned char disp[8], unsigned char n, unsigned char ok) {
+    unsigned char i, c = ok ? 0x3F : 0x79;
+    for (i = 0; i < 6; i++) disp[i] = c;
+    disp_step(disp, n);
+    tm1639_write_display(disp);
+    delay_ms(800);
+}
+/* 确认步骤：SMG2 步骤号闪烁提示“需人工”，期间 p3bit 按下即通过 */
+static unsigned char confirm_wait(unsigned char disp[8], unsigned char n, unsigned char p3bit, unsigned int ms) {
+    unsigned int t = 0; unsigned char on = 1;
+    while (t < ms) {
+        if (on) disp_step(disp, n); else { disp[6] = disp[7] = 0; }
+        tm1639_write_display(disp);
+        if (!(P3 & p3bit)) return 1;
+        delay_ms(250); t += 250; on = !on;
+    }
+    return 0;
 }
 static void show_allseg(unsigned char disp[8]) {
     unsigned char i;
@@ -158,15 +179,7 @@ static unsigned char uart_recv_to(unsigned char *out) {
     *out = SBUF; SCON &= ~0x01;
     return 1;
 }
-static unsigned char test_uart(void) {
-    static const unsigned char pat[] = {0x55, 0xAA, 0x00, 0xFF, 0x12, 0x34};
-    unsigned char i, rx;
-    for (i = 0; i < sizeof(pat); i++) {
-        uart_send(pat[i]);
-        if (!uart_recv_to(&rx) || rx != pat[i]) return 0;
-    }
-    return 1;
-}
+/* test_uart 已由 T3 内联 00..FF 回环取代 */
 
 /* ---------- EEPROM 连通性（虚焊排查）：擦末扇区 0x1200(512B)+写读回几字节 ---------- */
 /* 官方：IAP_CONTR=0x84 (IAPEN + WT=100@11.051MHz)；IAP_CMD 0x01读/0x02写/0x03擦；
@@ -211,93 +224,144 @@ static unsigned char test_eeprom(void) {
 static void run_tests(void) {
     unsigned char disp[8];
     unsigned int v;
+    unsigned char i, ok = 0;
 
     g_fail = 0;
     uart_str("==== HW TEST ====\r\n");
 
-    /* T1 显示自检（肉眼确认）：先全段查断段，再 12345678 查 GRID 顺序/倒装管方向 */
-    show_allseg(disp); tm1639_write_display(disp);
-    uart_str("T1 DISP: 查 8 管全段点亮(operator confirm)\r\n");
-    key_wait(0x08, 3000, disp);                /* SET 或超时进入下一项 */
-    {
-        unsigned char k;
-        for (k = 0; k < 8; k++)
-            disp[k] = (k == 2) ? seg_rotate180(seg_font[k + 1]) : seg_font[k + 1];
-        tm1639_write_display(disp);
-    }
-    uart_str("T1 DISP: 查左→右 12345678 顺序正确(operator confirm)\r\n");
-    key_wait(0x08, 3000, disp);
+    /* T1 显示自检：点亮所有数码管，SMG2=01，SET 或超时继续 */
+    clear_main(disp); show_allseg(disp); disp_step(disp, 1); tm1639_write_display(disp);
+    uart_str("T1 DISP: all segments lit [confirm SET]\r\n");
+    confirm_wait(disp, 1, 0x08, 4000);
 
-    /* T2 实时时钟：起振+走时(自动)；断电保持见计划 T9（手动切电核对） */
-    show_stage(disp, 2); tm1639_write_display(disp);
+    /* T2 实时时钟：主显 HH:MM，SMG1 显 SS，SMG2=02，5s */
     {
-        ds_time tt;
-        if (test_rtc()) uart_str("T2 RTC: PASS (tick ok)\r\n");
-        else { g_fail |= BIT(T_RTC); uart_str("T2 RTC: FAIL (no tick / not run)\r\n"); }
+        ds_time tt; unsigned int tries; unsigned char s0, s, hh, mm, ss;
+        clear_main(disp); disp_step(disp, 2); tm1639_write_display(disp);
+        uart_str("T2 RTC: ticking\r\n");
         ds1302_read_time(&tt);
-        uart_str("T2 RTC: CH="); uart_putc((tt.sec & 0x80) ? '1' : '0');
-        uart_str(" now="); dbg_time(&tt); uart_str("\r\n");
+        if (tt.sec & 0x80) {
+            ds_time d; d.sec = 0; d.min = 0; d.hr = 0; d.date = 1; d.month = 1; d.weekday = 1; d.year = 0x26;
+            ds1302_write_time(&d); ds1302_read_time(&tt);
+        }
+        s0 = (unsigned char)((tt.sec & 0x7F) >> 4) * 10 + (tt.sec & 0x0F);
+        for (tries = 0; tries < 10000; tries++) {
+            ds1302_read_time(&tt);
+            s = (unsigned char)((tt.sec & 0x7F) >> 4) * 10 + (tt.sec & 0x0F);
+            if (s != s0) { ok = 1; break; }
+            delay_ms(1);
+        }
+        for (i = 0; i < 10; i++) {
+            ds1302_read_time(&tt);
+            hh = (unsigned char)((tt.hr >> 4) * 10 + (tt.hr & 0x0F));
+            mm = (unsigned char)((tt.min >> 4) * 10 + (tt.min & 0x0F));
+            ss = (unsigned char)((tt.sec & 0x7F) >> 4) * 10 + (tt.sec & 0x0F);
+            clear_main(disp);
+            disp[0] = seg_font[hh / 10]; disp[1] = seg_font[hh % 10] | 0x80;
+            disp[2] = seg_font[mm / 10]; disp[3] = seg_font[mm % 10];
+            disp[4] = seg_font[ss / 10]; disp[5] = seg_font[ss % 10];
+            disp_step(disp, 2); tm1639_write_display(disp);
+            delay_ms(500);
+        }
+        if (ok) { uart_str("T2 RTC: PASS\r\n"); } else { g_fail |= BIT(T_RTC); uart_str("T2 RTC: FAIL\r\n"); }
+        flash_step(disp, 2, ok);
     }
 
-    /* T3 串口回环 */
-    show_stage(disp, 3); tm1639_write_display(disp);
-    if (test_uart()) uart_str("T3 UART: PASS (loopback ok)\r\n");
-    else { g_fail |= BIT(T_UART); uart_str("T3 UART: FAIL (need P3.0-P3.1 short)\r\n"); }
+    /* T3 串口回环：左发右显 00..FF，末显 HP，5s 后 T4，SMG2=03 */
+    {
+        unsigned char tx, rx, pass, any_fail = 0;
+        clear_main(disp); disp_step(disp, 3); tm1639_write_display(disp);
+        uart_str("T3 UART: loopback 00..FF\r\n");
+        for (tx = 0; ; ) {
+            uart_send(tx);
+            pass = (uart_recv_to(&rx) && rx == tx) ? 1 : 0;
+            if (!pass) any_fail = 1;
+            clear_main(disp);
+            disp[0] = SEG_HEX[tx >> 4]; disp[1] = SEG_HEX[tx & 0x0F];
+            disp[2] = seg_rotate180(SEG_HEX[rx >> 4]); disp[3] = SEG_HEX[rx & 0x0F];
+            disp_step(disp, 3); tm1639_write_display(disp);
+            uart_str("TX="); uart_hex(tx); uart_str(" RX="); uart_hex(rx); uart_str(pass ? " OK\r\n" : " FAIL\r\n");
+            if (tx == 0xFF) break;
+            tx++; delay_ms(20);
+        }
+        clear_main(disp); disp[0] = 0x76; disp[1] = 0x77; disp_step(disp, 3); tm1639_write_display(disp);  /* HP */
+        delay_ms(5000);
+        if (any_fail) { g_fail |= BIT(T_UART); uart_str("T3 UART: FAIL\r\n"); }
+        else uart_str("T3 UART: PASS\r\n");
+    }
 
-    /* T4 按键（实测按下） */
-    show_stage(disp, 4); tm1639_write_display(disp);
-    uart_str("T4 KEY: press UP then SET\r\n");
-    if (key_wait(0x04, 15000, disp) && key_wait(0x08, 15000, disp)) {
-        uart_str("T4 KEY: PASS\r\n");
-    } else { g_fail |= BIT(T_KEY); uart_str("T4 KEY: FAIL (no press)\r\n"); }
+    /* T4 按键：SET 加高位、UP 加低位，5s 内两键都按过即 PASS，SMG2=04 */
+    {
+        unsigned char hi = 0, lo = 0, done = 0; unsigned int t = 0;
+        clear_main(disp); disp_step(disp, 4); disp_hilo(disp, hi, lo); tm1639_write_display(disp);
+        uart_str("T4 KEY: SET->hi+1, UP->lo+1 (within 5s)\r\n");
+        while (t < 5000) {
+            if (!(P3 & 0x04)) { delay_ms(30); if (!(P3 & 0x04)) { hi = (hi + 1) % 100; disp_hilo(disp, hi, lo); tm1639_write_display(disp); while (!(P3 & 0x04)); } }
+            if (!(P3 & 0x08)) { delay_ms(30); if (!(P3 & 0x08)) { lo = (lo + 1) % 100; disp_hilo(disp, hi, lo); tm1639_write_display(disp); while (!(P3 & 0x08)); } }
+            if (hi > 0 && lo > 0) { done = 1; break; }
+            delay_ms(10); t += 10;
+        }
+        if (done) { uart_str("T4 KEY: PASS\r\n"); flash_step(disp, 4, 1); }
+        else { g_fail |= BIT(T_KEY); uart_str("T4 KEY: FAIL\r\n"); flash_step(disp, 4, 0); }
+    }
 
-    /* T5 蜂鸣器（人耳确认） */
-    show_stage(disp, 5); tm1639_write_display(disp);
-    uart_str("T5 BEEP: listen (operator confirm)\r\n");
-    beep_ms(300); delay_ms(200);
+    /* T5 蜂鸣器：响 3 次，SMG2=05 */
+    clear_main(disp); disp[0] = 0x7C; disp[1] = 0x79; disp[2] = 0x79; disp[3] = 0x77; disp_step(disp, 5); tm1639_write_display(disp);
+    uart_str("T5 BEEP: 3 beeps\r\n");
+    { unsigned char k; for (k = 0; k < 3; k++) { BEEP_ON(); delay_ms(200); BEEP_OFF(); delay_ms(200); } }
 
-    /* T6 状态灯（肉眼确认） */
-    show_stage(disp, 6); tm1639_write_display(disp);
-    uart_str("T6 LED: observe red blink (operator confirm)\r\n");
-    { unsigned char i; for (i = 0; i < 4; i++) { LED_ON(); delay_ms(150); LED_OFF(); delay_ms(150); } }
+    /* T6 状态灯：闪 5s，SMG2=06 */
+    clear_main(disp); disp[0] = 0x38; disp[1] = 0x79; disp[2] = 0x7E; disp_step(disp, 6); tm1639_write_display(disp);
+    uart_str("T6 LED: blink 5s\r\n");
+    { unsigned char k; for (k = 0; k < 10; k++) { LED_ON(); delay_ms(250); LED_OFF(); delay_ms(250); } }
     LED_ON();
 
-    /* T7 光敏 ADC */
-    show_stage(disp, 7); tm1639_write_display(disp);
+    /* T7 光敏 ADC：显 raw 5s，SMG2=07 */
+    clear_main(disp); disp_step(disp, 7); tm1639_write_display(disp);
     v = adc_read(0);
     uart_str("T7 LDR: raw="); uart_u8((unsigned char)v); uart_str("\r\n");
-    if (v > 0 && v < 1023) uart_str("T7 LDR: PASS\r\n");
-    else { g_fail |= BIT(T_LDR); uart_str("T7 LDR: FAIL (open/short)\r\n"); }
+    clear_main(disp); disp_u16(disp, v); disp_step(disp, 7); tm1639_write_display(disp);
+    delay_ms(5000);
+    if (v > 0 && v < 1023) { uart_str("T7 LDR: PASS\r\n"); flash_step(disp, 7, 1); }
+    else { g_fail |= BIT(T_LDR); uart_str("T7 LDR: FAIL\r\n"); flash_step(disp, 7, 0); }
 
-    /* T8 热敏 ADC */
-    show_stage(disp, 8); tm1639_write_display(disp);
+    /* T8 热敏 ADC：显 raw 5s，SMG2=08 */
+    clear_main(disp); disp_step(disp, 8); tm1639_write_display(disp);
     v = adc_read(1);
     uart_str("T8 NTC: raw="); uart_u8((unsigned char)v); uart_str("\r\n");
-    if (v > 0 && v < 1023) uart_str("T8 NTC: PASS\r\n");
-    else { g_fail |= BIT(T_NTC); uart_str("T8 NTC: FAIL (open/short)\r\n"); }
+    clear_main(disp); disp_u16(disp, v); disp_step(disp, 8); tm1639_write_display(disp);
+    delay_ms(5000);
+    if (v > 0 && v < 1023) { uart_str("T8 NTC: PASS\r\n"); flash_step(disp, 8, 1); }
+    else { g_fail |= BIT(T_NTC); uart_str("T8 NTC: FAIL\r\n"); flash_step(disp, 8, 0); }
 
-    /* T9 EEPROM 连通性（虚焊排查：擦+写读回末扇区；自动，无需手动断电，故在 T10 前） */
-    show_stage(disp, 9); tm1639_write_display(disp);
-    if (test_eeprom()) uart_str("T9 EEPROM: PASS (erase+rd/wr 0x1200 ok)\r\n");
-    else { g_fail |= BIT(T_EEP); uart_str("T9 EEPROM: FAIL (IAP bus / solder)\r\n"); }
+    /* T9 EEPROM 连通性：通过显 01，错误显 EE，结果 5s，SMG2=09 */
+    clear_main(disp); disp_step(disp, 9); tm1639_write_display(disp);
+    uart_str("T9 EEPROM: erase+rd/wr 0x1200\r\n");
+    ok = test_eeprom();
+    clear_main(disp);
+    if (ok) { disp[1] = seg_font[0]; disp[2] = seg_font[1]; }   /* 01 */
+    else { disp[1] = 0x79; disp[2] = 0x79; }                    /* EE */
+    disp_step(disp, 9); tm1639_write_display(disp);
+    if (ok) uart_str("T9 EEPROM: PASS\r\n");
+    else { g_fail |= BIT(T_EEP); uart_str("T9 EEPROM: FAIL\r\n"); }
+    delay_ms(5000);
 
-    /* T10 断电保持（最后一项；上电首读 g_ds_init_action 即电池保持信号，逻辑同 ds1302-clock 已验证） */
-    show_stage(disp, 10); tm1639_write_display(disp);
-    uart_str("T10 RETENTION: boot_action="); uart_putc('0' + g_boot_action);
-    if (g_boot_action == 0)
-        uart_str(" PASS (上电已在走时=电池保住)\r\n");
-    else
-        uart_str(" WARN 上电停振(新板或电池失效)，已启动；请切主电>=3s再上电确认\r\n");
-    key_wait(0x08, 3000, disp);
+    /* T10 断电保持（最后）：SMG2=10，结果 5s */
+    clear_main(disp); disp_step(disp, 10); tm1639_write_display(disp);
+    uart_str("T10 RETENTION: boot_action="); uart_putc((unsigned char)('0' + g_boot_action));
+    if (g_boot_action == 0) uart_str(" PASS (running=cell ok)\r\n");
+    else uart_str(" WARN (stopped)\r\n");
+    clear_main(disp); disp[0] = seg_font[g_boot_action]; disp_step(disp, 10); tm1639_write_display(disp);
+    delay_ms(5000);
 
-    /* 汇总 */
+    /* 汇总（其他不变） */
     show_result(disp, g_fail == 0); tm1639_write_display(disp);
     if (g_fail == 0) {
         uart_str("ALL PASS\r\n");
-        beep_ms(120); delay_ms(120); beep_ms(120);   /* 双短音 */
+        beep_ms(120); delay_ms(120); beep_ms(120);
     } else {
         uart_str("FAIL mask="); uart_hex((unsigned char)(g_fail >> 8)); uart_hex((unsigned char)(g_fail & 0xFF)); uart_str("\r\n");
-        beep_ms(600);                                  /* 长音 */
+        beep_ms(600);
     }
 }
 
