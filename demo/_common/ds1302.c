@@ -55,18 +55,28 @@ static void ds_write_base(void) {
     ds_write_byte(0x8E, 0x80);   /* 写保护 */
 }
 
+unsigned char g_ds_init_action = 0;   /* 0=保住已走时 1=CH=1掉电(电池未保住) 2=BCD非法；供调试 */
+
 void ds1302_init(void) {
     ds_time t;
-    ds1302_read_time(&t);                    /* 突发读，可靠(单字节 ds_read_byte 连续读会被芯片忽略) */
-    if (t.sec & 0x80) {                      /* CH=1：停振未走时 */
+    ds1302_read_time(&t);                    /* 上电首读可能过早读到乱码(CH=1)，重试确认 */
+    if (t.sec & 0x80) {
+        ds_delay(); ds_delay();
+        ds1302_read_time(&t);
+    }
+    if (t.sec & 0x80) {                      /* 确属停振(掉电/电池未保住) */
+        g_ds_init_action = 1;
         ds_write_base();
         return;
     }
     if (!ds_bcd_ok(t.sec, 0x59) || !ds_bcd_ok(t.min, 0x59) ||
         !ds_bcd_ok(t.hr, 0x23) || t.date == 0 || !ds_bcd_ok(t.date, 0x31) ||
         t.month == 0 || !ds_bcd_ok(t.month, 0x12) || !ds_bcd_ok(t.year, 0x99)) {
+        g_ds_init_action = 2;
         ds_write_base();                     /* 纠正为基准时间 2026-08-26 00:00:00 */
+        return;
     }
+    g_ds_init_action = 0;                    /* 正常运行，保留已走时 */
 }
 
 /* ponytail: 读用突发(单 CE 周期，实测稳定)；单字节 ds_read_byte 在连续多次 CE 间会被芯片忽略

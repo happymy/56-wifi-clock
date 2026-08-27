@@ -111,8 +111,10 @@ void main(void) {
     uart_str("boot\r\n");
 
     tm1639_init();
+    delay_ms(500);               /* 等 Vcc 稳定后再访问 DS1302，避免上电首读读到乱码误判掉电 */
     ds1302_init();               /* 若停振则写入默认时间并启动走时 */
     { ds_time t0; ds1302_read_time(&t0); dbg_time("init", &t0); }
+    uart_str("init_action="); uart_u8(g_ds_init_action); uart_str("\r\n");
 
     while (1) {
         unsigned char up, set;
