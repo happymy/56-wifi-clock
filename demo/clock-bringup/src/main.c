@@ -61,7 +61,7 @@ static void build_scroll(unsigned char disp[8], unsigned char frame, unsigned in
 
 void main(void) {
     unsigned char disp[8];
-    unsigned char frame, lvl, last_lvl = 0xFF;
+    unsigned char frame, lvl;
     unsigned char mode = MODE_SCROLL;
     unsigned char prev_up = 0, prev_set = 0, both_cnt = 0;
     unsigned int tick = 0, light, temp;
@@ -85,12 +85,12 @@ void main(void) {
 
     while (1) {
         light = adc_read(0);
-        {                                               /* 光敏标定：遮住≈512..767→0(最暗)，强光<~85→7(最亮) */
+        {                                               /* 仅用于显示档位: 暗(≥512)→0, 亮→7 */
             unsigned int t = light;
             if (t > 512) t = 512;
             lvl = (unsigned char)(7 - (t * 7) / 512);
         }
-        if (lvl != last_lvl) { tm1639_set_brightness(lvl); last_lvl = lvl; }
+        tm1639_set_light(light);   /* 亮→硬件档 0..7; 暗区(>512)叠加软件 PWM 压到 1/16 之下 */
 
         tick++;
         frame = (unsigned char)(tick >> 3);              /* 每 8 tick(2s) 进一位 */

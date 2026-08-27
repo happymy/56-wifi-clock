@@ -14,6 +14,7 @@
 void tm1639_init(void);
 void tm1639_write_display(const unsigned char data[8]);
 void tm1639_set_brightness(unsigned char level); /* 0..7 */
+void tm1639_set_light(unsigned int light); /* 亮→硬件档 0..7; 暗区(>512)叠加软件 PWM 压到 1/16 之下 */
 
 extern const unsigned char seg_font[16]; /* 共阴 0-9, A-F */
 unsigned char seg_rotate180(unsigned char d); /* 倒装管段码旋转 180° */
