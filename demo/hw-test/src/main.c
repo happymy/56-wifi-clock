@@ -12,8 +12,10 @@
      T5 蜂鸣器    -> BEEP(P2.1) 发声(人耳确认)
      T6 状态灯    -> LED_T(P1.2) 闪烁(肉眼确认)
      T7 光敏      -> GM(P1.0) ADC 未悬空/未短接
-     T8 热敏      -> RM(P1.1) ADC 未悬空/未短接
-   结果：自动判定项(T2/T3/T4/T7/T8)失败置位 g_fail；T1/T5/T6 由产线员肉眼确认。
+      T8 热敏      -> RM(P1.1) ADC 未悬空/未短接
+     T9 EEPROM    -> IAP 擦/写读回末扇区(连通性/虚焊，不遍历不测寿命)
+     T10 断电保持 -> DS1302+CR1220(看 g_boot_action；手动切电核对，置最后)
+    结果：自动判定项(T2/T3/T4/T7/T8/T9)失败置位 g_fail；T1/T5/T6 由产线员肉眼确认。
    显示：大屏(GRID1-4)显示当前测试号；全过显「0」、有失败显「E」。串口打印明细。 */
 
 #define BIT(n) (1u << (n))
@@ -25,8 +27,9 @@
 #define T_LED  5
 #define T_LDR  6
 #define T_NTC  7
+#define T_EEP  8
 
-static unsigned char g_fail;
+static unsigned int g_fail;
 static unsigned char g_boot_action;   /* 上电首读 ds1302_init 动作: 0=保住走时 1=掉电停振 2=BCD非法 */
 
 /* ---------- 串口（复用 uart-test 已验证配置：Timer2 波特源 / 9600 8N1）---------- */
@@ -165,6 +168,45 @@ static unsigned char test_uart(void) {
     return 1;
 }
 
+/* ---------- EEPROM 连通性（虚焊排查）：擦末扇区 0x1200(512B)+写读回几字节 ---------- */
+/* 官方：IAP_CONTR=0x84 (IAPEN + WT=100@11.051MHz)；IAP_CMD 0x01读/0x02写/0x03擦；
+   触发序 0x5A→0xA5；地址每次重设(不自动加1)；结束 IapIdle 防误写。EEPROM 5K@0x0000-0x13FF */
+static void iap_wait(void) { volatile unsigned char k; for (k = 0; k < 40; k++); }
+static void iap_trig(void) { IAP_TRIG = 0x5A; IAP_TRIG = 0xA5; iap_wait(); }
+static void iap_idle(void) {
+    IAP_CONTR = 0; IAP_CMD = 0; IAP_TRIG = 0;
+    IAP_ADDRH = 0x80; IAP_ADDRL = 0;   /* 指到 EEPROM 外，防误写 */
+}
+static unsigned char test_eeprom(void) {
+    static const unsigned char AD[3] = {0x00, 0x01, 0xFF};   /* 0x1200/0x1201/0x12FF */
+    static const unsigned char PA[3] = {0x5A, 0xA5, 0x3C};
+    unsigned int i;
+    unsigned char ok = 1;
+    IAP_CONTR = 0x84;                                  /* 使能 + 等待时间(≤12MHz) */
+    /* 擦除 0x1200 扇区(512B)，回读应全 0xFF */
+    IAP_ADDRH = 0x12; IAP_ADDRL = 0x00;
+    IAP_CMD = 0x03; iap_trig();
+    for (i = 0; i < 512; i++) {
+        IAP_ADDRH = (unsigned char)(0x12 + (i >> 8)); IAP_ADDRL = (unsigned char)i;
+        IAP_CMD = 0x01; iap_trig();
+        if (IAP_DATA != 0xFF) { ok = 0; break; }
+    }
+    if (ok) {                                          /* 写 3 个不同位置，再读回比对 */
+        for (i = 0; i < 3; i++) {
+            IAP_ADDRH = 0x12; IAP_ADDRL = AD[i];
+            IAP_DATA = PA[i]; IAP_CMD = 0x02; iap_trig();
+        }
+        for (i = 0; i < 3; i++) {
+            IAP_ADDRH = 0x12; IAP_ADDRL = AD[i];
+            IAP_CMD = 0x01; iap_trig();
+            if (IAP_DATA != PA[i]) { ok = 0; break; }
+        }
+    }
+    if (IAP_CONTR & 0x10) { IAP_CONTR &= ~0x10; ok = 0; }   /* CMD_FAIL：地址越界等 */
+    iap_idle();
+    return ok;
+}
+
 /* ---------- 主测试流程 ---------- */
 static void run_tests(void) {
     unsigned char disp[8];
@@ -234,9 +276,14 @@ static void run_tests(void) {
     if (v > 0 && v < 1023) uart_str("T8 NTC: PASS\r\n");
     else { g_fail |= BIT(T_NTC); uart_str("T8 NTC: FAIL (open/short)\r\n"); }
 
-    /* T9 断电保持（最后一项；上电首读 g_ds_init_action 即电池保持信号，逻辑同 ds1302-clock 已验证） */
+    /* T9 EEPROM 连通性（虚焊排查：擦+写读回末扇区；自动，无需手动断电，故在 T10 前） */
     show_stage(disp, 9); tm1639_write_display(disp);
-    uart_str("T9 RETENTION: boot_action="); uart_putc('0' + g_boot_action);
+    if (test_eeprom()) uart_str("T9 EEPROM: PASS (erase+rd/wr 0x1200 ok)\r\n");
+    else { g_fail |= BIT(T_EEP); uart_str("T9 EEPROM: FAIL (IAP bus / solder)\r\n"); }
+
+    /* T10 断电保持（最后一项；上电首读 g_ds_init_action 即电池保持信号，逻辑同 ds1302-clock 已验证） */
+    show_stage(disp, 10); tm1639_write_display(disp);
+    uart_str("T10 RETENTION: boot_action="); uart_putc('0' + g_boot_action);
     if (g_boot_action == 0)
         uart_str(" PASS (上电已在走时=电池保住)\r\n");
     else
@@ -249,7 +296,7 @@ static void run_tests(void) {
         uart_str("ALL PASS\r\n");
         beep_ms(120); delay_ms(120); beep_ms(120);   /* 双短音 */
     } else {
-        uart_str("FAIL mask="); uart_hex(g_fail); uart_str("\r\n");
+        uart_str("FAIL mask="); uart_hex((unsigned char)(g_fail >> 8)); uart_hex((unsigned char)(g_fail & 0xFF)); uart_str("\r\n");
         beep_ms(600);                                  /* 长音 */
     }
 }
