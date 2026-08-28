@@ -2,11 +2,11 @@
 
 /* 软件 PWM 极暗：硬件 8 级占空比下限为 1/16(档0)，全黑(光敏>512)时仍偏亮。
    用定时器 T0 间歇开关显示，把有效占空比压到 1/16 之下。
-   节拍 0.25ms(12T/11.051MHz 复位默认)，PWM_STEPS 步一周期 → 开关边沿≈4kHz，肉眼不闪。
+   节拍 0.0625ms(12T/11.051MHz 复位默认)，PWM_STEPS 步一周期 → 物理开关切换≈500Hz，肉眼不闪。
    调光比例 = pwm_on_steps/PWM_STEPS，与节拍快慢无关，故 12T/1T 偏差只改频率不改亮度。 */
 #define PWM_TH 0xFF
-#define PWM_TL 0x1A
-#define PWM_STEPS 16
+#define PWM_TL 0xC6
+#define PWM_STEPS 64
 static unsigned char pwm_active = 0;   /* 1 = 软件 PWM 极暗启用 */
 static unsigned char pwm_on_steps = PWM_STEPS;
 static unsigned char pwm_phase = 0;
@@ -146,7 +146,9 @@ void tm1639_pwm_isr(void) __interrupt(1) {
     TH0 = PWM_TH; TL0 = PWM_TL;      /* 16 位模式手动重装 */
     TF0 = 0;
     if (pwm_active) {
+        /* 仅在相位边界发命令, 避免每拍写总线(降低 CPU 占用): 周期 4ms 仅 2 次写 */
+        if (pwm_phase == 0)               tm_set_display_enable(1); /* 开(基档 1/16) */
+        else if (pwm_phase == pwm_on_steps) tm_set_display_enable(0); /* 关 */
         if (++pwm_phase >= PWM_STEPS) pwm_phase = 0;
-        tm_set_display_enable(pwm_phase < pwm_on_steps);
     }
 }
