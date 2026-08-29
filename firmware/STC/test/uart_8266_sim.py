@@ -203,7 +203,7 @@ def cmd_monitor(args):
 def cmd_server(args):
     sim = Sim(args.port, args.baud)
     if args.rotate is not None:
-        sim.our_cfg = bytes([args.rotate & 1]) + bytes(53)  # 随 REQ_CFG 下推 display_mode
+        sim.our_cfg[0] = args.rotate & 1                     # 随 REQ_CFG 下推 display_mode（保留其它字节/led_en 默认）
     if args.led is not None:
         sim.our_cfg[20] = args.led & 1                      # 随 REQ_CFG 下推 led_en
     if args.boot:

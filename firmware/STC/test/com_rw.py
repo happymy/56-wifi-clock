@@ -3,13 +3,15 @@ import serial, time, sys
 PORT = "COM3"
 BAUD = 9600
 
-def chk(frame):  # cmd,len,payload...
-    return frame[0] ^ frame[1] ^ (sum(frame[2:]) & 0xFF)
+def chk(body):  # cmd,len,payload... 全部字节异或（与 51 固件一致）
+    c = 0
+    for x in body:
+        c ^= x
+    return c
 
 def frame(cmd, payload=b""):
     body = bytes([cmd, len(payload)]) + payload
-    body += bytes([body[0] ^ body[1] ^ (sum(payload) & 0xFF)])
-    return b"\xAA\x55" + body
+    return b"\xAA\x55" + body + bytes([chk(body)])
 
 ser = serial.Serial(PORT, BAUD, timeout=1.0)
 print(f"opened {PORT} @ {BAUD}")
@@ -43,8 +45,8 @@ ser.write(frame(0x8F))
 reader(4)
 
 print("--- send SET_TIME 2026-01-01 12:00:00 ---")
-# ds1302: sec,min,hr,week,day,mon,year
-t = bytes([0x00, 0x00, 0x12, 0x04, 0x01, 0x01, 0x26, 0x00])
+# 51 解析序: 年,月,日,星期,时,分,秒,时区 (BCD; 2026-01-01=周四→5)
+t = bytes([0x26, 0x01, 0x01, 0x05, 0x12, 0x00, 0x00, 0x08])
 ser.write(frame(0x81, t))
 reader(4)
 
