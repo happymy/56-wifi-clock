@@ -9,8 +9,8 @@
 #define BEEP_ON()   do { P2 &= ~0x02; } while (0)
 #define BEEP_OFF()  do { P2 |= 0x02; } while (0)
 /* LED(P1.2) 状态指示：亮=已联网同步（由 NET_STATUS 帧驱动，M10 赋值） */
-#define LED_ON()    do { P1 |= 0x04; } while (0)
-#define LED_OFF()   do { P1 &= ~0x04; } while (0)
+#define LED_ON()    do { P1 &= ~0x04; } while (0)   /* active-low: P1.2 拉低亮 */
+#define LED_OFF()   do { P1 |= 0x04; } while (0)
 
 static void delay_ms(unsigned int ms) {
     unsigned int i, j;
@@ -260,7 +260,7 @@ void main(void) {
     BEEP_OFF();
     P3M1 &= ~0x0C; P3M0 &= ~0x0C; /* P3.2/3.3 准双向 */
     /* 安全红线: P3.0/P3.1 保持准双向, 绝不置强推挽 */
-    P1 &= ~0x04;                 /* LED_T 红：运行指示 */
+    P1 |= 0x04;                  /* LED_T 红：初始灭(active-low) */
 
     P1ASF |= 0x03;               /* P1.0 光敏 / P1.1 热敏 模拟输入 */
     P1M1 |= 0x03; P1M0 &= ~0x03; /* 高阻 */
