@@ -42,9 +42,12 @@ void disp_render(unsigned char mode, const __xdata ds_time *t, int temp_x10,
         disp[3] |= 0x80;
         clear_smg(disp);
         (void)unit_c;
-    } else { /* DISP_TIME */
-        put_big2(disp, (t->hr >> 4) & 0x0F, t->hr & 0x0F);
-        put_smg2(disp, (t->sec >> 4) & 0x0F, t->sec & 0x0F);
+    } else { /* DISP_TIME: 大屏 HH:MM, 小时个位带小数点作冒号 */
+        disp[0] = seg_font[(t->hr >> 4) & 0x0F];
+        disp[1] = seg_font[t->hr & 0x0F] | 0x80;
+        disp[2] = seg_rotate180(seg_font[(t->min >> 4) & 0x0F]);
+        disp[3] = seg_font[t->min & 0x0F];
+        put_smg2(disp, (t->sec >> 4) & 0x0F, (t->sec & 0x0F));
         bin2(disp + 4, temp_x10, (temp_x10 < 0) ? 1 : 0);  /* SMG1=温度 */
     }
 }

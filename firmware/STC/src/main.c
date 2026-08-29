@@ -149,9 +149,11 @@ static void uart_init(void) {
     ES = 1; EA = 1;              /* 开串口中断（仅收） */
 }
 static void uart_send(unsigned char c) {
+    ES = 0;                       /* 关收中断：RI/TI 共用向量，ISR 会清 TI，否则下方忙等与 ISR 死锁 */
     SBUF = c;
     while (!(SCON & 0x02));       /* 等 TI */
     SCON &= ~0x02;
+    ES = 1;                       /* 恢复收中断 */
 }
 static void uart_send_frame(unsigned char cmd, __xdata unsigned char *p, unsigned char len) {
     unsigned char i, chk = cmd ^ len;
@@ -193,12 +195,12 @@ static void apply_set_cfg(__xdata unsigned char *p) {
 }
 static void uart_dispatch(unsigned char cmd, __xdata unsigned char *p, unsigned char len) {
     switch (cmd) {
-        case CMD_SET_TIME: if (len >= 8) apply_set_time(p); break;
-        case CMD_SET_CFG:  if (len >= 54) apply_set_cfg(p); break;
-        case CMD_NET_STAT: if (len >= 1) net_status = p[0]; break;
-        case CMD_STA_IP:   if (len >= 4) sta_ip_last = p[3]; break;
-        case CMD_REQ_CFG:  uart_send_frame(CMD_SET_CFG, (__xdata unsigned char *)&cfg, 54); break;
-        case CMD_BOOT:     esp_online = 1; break;
+        case CMD_BOOT:     esp_online = 1; break;   /* 握手: 此后才接受 8266 下行帧 */
+        case CMD_SET_TIME: if (esp_online && len >= 8) apply_set_time(p); break;
+        case CMD_SET_CFG:  if (esp_online && len >= 54) apply_set_cfg(p); break;
+        case CMD_NET_STAT: if (esp_online && len >= 1) net_status = p[0]; break;
+        case CMD_STA_IP:   if (esp_online && len >= 4) sta_ip_last = p[3]; break;
+        case CMD_REQ_CFG:  if (esp_online) uart_send_frame(CMD_SET_CFG, (__xdata unsigned char *)&cfg, 54); break;
         default: break;
     }
 }
@@ -211,7 +213,11 @@ static void uart_poll(void) {
             case 0: if (b == 0xAA) p_st = 1; break;
             case 1: p_st = (b == 0x55) ? 2 : 0; break;
             case 2: p_cmd = b; p_chk = b; p_st = 3; break;
-            case 3: p_len = b; p_chk ^= b; p_idx = 0; p_st = p_len ? 4 : 5; break;
+            case 3: p_len = b; p_chk ^= b; p_idx = 0;
+                    if (p_len == 0) p_st = 5;
+                    else if (p_len > 60) p_st = 0;   /* 超缓冲/非法帧:丢弃,防 p_buf 越界踩内存挂死 */
+                    else p_st = 4;
+                    break;
             case 4: p_buf[p_idx++] = b; p_chk ^= b; if (p_idx >= p_len) p_st = 5; break;
             case 5: if (b == p_chk) uart_dispatch(p_cmd, p_buf, p_len); p_st = 0; break;
         }

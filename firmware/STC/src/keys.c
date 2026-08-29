@@ -28,6 +28,7 @@ typedef struct {
     unsigned char t_up;
     unsigned char long_fired;
     unsigned char dbl_pending;
+    unsigned char second;     /* 第二击进行中(第一击已 pending) */
 } kst_t;
 static __xdata kst_t st[2];
 
@@ -40,29 +41,31 @@ void keys_init(void) {
     st[0].t_up = st[1].t_up = 0;
     st[0].long_fired = st[1].long_fired = 0;
     st[0].dbl_pending = st[1].dbl_pending = 0;
+    st[0].second = st[1].second = 0;
     both_hold = 0;
 }
 
-/* 处理单个键：cur=当前采样, s=该键状态 */
+/* 处理单个键：cur=当前采样, s=该键状态。
+   单击: 松开后等 DBL_CNT 拍无第二击→EV_SINGLE；双击: 第一击 pending 内再按下→松开发 EV_DOUBLE；
+   长按: 按住达 LONG_CNT 拍→EV_LONG(松开不再发单击/双击)。 */
 static void scan_one(unsigned char cur, __xdata kst_t *s, unsigned char btn) {
-    if (cur && !s->down) {               /* 按下边沿 */
-        s->down = 1; s->t_down = 0; s->long_fired = 0;
-    }
     if (cur) {
+        if (!s->down) {                       /* 按下边沿 */
+            s->down = 1; s->t_down = 0; s->long_fired = 0; s->t_up = 0;
+            if (s->dbl_pending) { s->dbl_pending = 0; s->second = 1; } /* 进入第二击 */
+        }
         s->t_down++;
         if (!s->long_fired && s->t_down >= LONG_CNT) {
-            emit(btn, EV_LONG); s->long_fired = 1; s->dbl_pending = 0;
+            emit(btn, EV_LONG); s->long_fired = 1; s->second = 0;
         }
     } else {
-        if (s->down) {                   /* 松开边沿 */
-            if (!s->long_fired) {
-                if (s->t_up < DBL_CNT) { emit(btn, EV_DOUBLE); s->dbl_pending = 0; }
-                else { s->dbl_pending = 1; }
-            }
+        if (s->down) {                        /* 松开边沿 */
             s->down = 0; s->t_up = 0;
+            if (s->long_fired) { s->second = 0; return; }      /* 长按已处理 */
+            if (s->second) { emit(btn, EV_DOUBLE); s->second = 0; } /* 第二击→双击 */
+            else { s->dbl_pending = 1; }                           /* 第一击→待第二击 */
         } else {
-            s->t_up++;
-            if (s->dbl_pending && s->t_up >= DBL_CNT) {
+            if (s->dbl_pending && ++s->t_up >= DBL_CNT) {
                 emit(btn, EV_SINGLE); s->dbl_pending = 0;
             }
         }
