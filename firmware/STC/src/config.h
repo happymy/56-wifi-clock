@@ -5,7 +5,7 @@
    51 本地仅改 bright_mode/bright_lvl、cd_preset 与时间(DS1302 非本结构)；
    其余字段由 8266 Web 经 SET_CFG 下推。EEPROM 持久化见 M7。 */
 typedef struct {
-    unsigned char display_mode;      /* 0=固定(仅时间) 1=自动轮显 */
+    unsigned char display_mode;      /* 0=不自动轮显 1=自动轮显(8266 控制, 每分钟整分轮换整屏主模式) */
     unsigned char bright_mode;       /* 0=自动(光敏) 1=手动 */
     unsigned char bright_lvl;        /* 手动亮度档 1–8 */
     signed   char temp_offset;       /* 有符号温度补偿 */

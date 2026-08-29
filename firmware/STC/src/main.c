@@ -383,6 +383,7 @@ void main(void) {
         /* 分钟变化：整点报时 + 闹钟匹配（响铃中不重复触发） */
         if (t.min != last_min) {
             last_min = t.min;
+            if (cfg.display_mode == 1) mode = (mode < DISP_TEMP) ? (mode + 1) : DISP_TIME;  /* 8266 控制: 每分钟轮换整屏主模式 */
             if (t.min == 0 && cfg.chime >= 1) beep_once();
             else if (t.min == 30 && cfg.chime == 2) beep_once();
             if (!ring_alarm && !snooze_ticks) {
