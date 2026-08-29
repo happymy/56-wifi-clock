@@ -32,7 +32,7 @@ typedef struct {
 } kst_t;
 static __xdata kst_t st[2];
 
-static unsigned char both_hold = 0;
+static unsigned char both_latch = 0;   /* 双键手势锁: 两键曾同按即置1, 两键都松才清(吞异步松手) */
 
 void keys_init(void) {
     q_head = q_tail = q_cnt = 0;
@@ -42,7 +42,7 @@ void keys_init(void) {
     st[0].long_fired = st[1].long_fired = 0;
     st[0].dbl_pending = st[1].dbl_pending = 0;
     st[0].second = st[1].second = 0;
-    both_hold = 0;
+    both_latch = 0;
 }
 
 /* 处理单个键：cur=当前采样, s=该键状态(节拍 ~10ms，见 main.c)。
@@ -75,15 +75,16 @@ static void scan_one(unsigned char cur, __xdata kst_t *s, unsigned char btn) {
 void keys_scan(void) {
     unsigned char p0 = pressed(KEY_SET);
     unsigned char p1 = pressed(KEY_UP);
-    if (p0 && p1) {
-        both_hold = 1;
-        /* 双键同按吞掉单键状态机：清 down+dbl_pending，松手不再误判单击/双击→进亮度
-           (根因：同按时跳过 scan_one，down 残留而 t_down 不涨；dbl_pending 残留则超时发单击) */
+    if (p0 && p1) {                       /* 双键同按: 启手势锁, 清单键状态防异步松手误发 */
+        both_latch = 1;
         st[0].down = st[1].down = 0;
         st[0].dbl_pending = st[1].dbl_pending = 0;
         return;
     }
-    both_hold = 0;
+    if (both_latch) {                      /* 手势中(一先松): 继续吞, 两键都松才解除 */
+        if (!p0 && !p1) both_latch = 0;
+        return;
+    }
     scan_one(p0, &st[0], KEY_SET);
     scan_one(p1, &st[1], KEY_UP);
 }
@@ -96,4 +97,4 @@ unsigned char key_get(__xdata key_ev_t *e) {
     return 1;
 }
 
-unsigned char key_both_hold(void) { return both_hold; }
+unsigned char key_both_hold(void) { return both_latch; }   /* 手势进行中=两键曾同按且未都松 */
