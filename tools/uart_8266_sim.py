@@ -285,7 +285,7 @@ def main():
                    help="可选 .bin 配置文件（不足 54B 补零）")
     p.set_defaults(func=cmd_setcfg)
 
-    p = sub.add_parser("staip", help="发送 STA_IP(0x88) 供双击 SET 滚显")
+    p = sub.add_parser("staip", help="发送 STA_IP(0x88) 供双击 SET 显示 P+IP末段")
     p.add_argument("port"); p.add_argument("ip"); p.set_defaults(func=cmd_staip)
 
     args = ap.parse_args()

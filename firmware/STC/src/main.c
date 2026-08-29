@@ -45,20 +45,11 @@ static void inc_bcd(__xdata unsigned char *f, unsigned char max_dec) {
     if (++v > max_dec) v = 0;
     { unsigned char b[2]; u2bcd(b, (unsigned char)v); *f = (b[0] << 4) | b[1]; }
 }
-static unsigned char days_in_month(unsigned char mon_bcd, unsigned char yr_bcd) {
-    static const unsigned char d[] = {31,28,31,30,31,30,31,31,30,31,30,31};
-    int m = bcd2bin(mon_bcd);
-    int y = 2000 + bcd2bin(yr_bcd);
-    if (m == 2) {
-        int leap = ((y & 3) == 0);   /* 2000-2099 范围: 仅 %4, 等价闰年; 免除法库 */
-        return (unsigned char)(leap ? 29 : 28);
-    }
-    if (m < 1 || m > 12) return 31;
-    return d[m - 1];
-}
 static void inc_date(__xdata ds_time *t) {
+    unsigned char m = bcd2bin(t->month);
+    unsigned char max = (m == 2) ? 28  /* Feb 恒28(闰年2/29由8266对时校正, 省 CODE) */
+                                 : ((m <= 7) ? ((m & 1) ? 31 : 30) : ((m & 1) ? 30 : 31));  /* 大小月, 无静态表 */
     unsigned char d = bcd2bin(t->date);
-    unsigned char max = days_in_month(t->month, t->year);
     if (++d > max) d = 1;
     { unsigned char b[2]; u2bcd(b, d); t->date = (b[0] << 4) | b[1]; }
 }
@@ -253,7 +244,7 @@ void main(void) {
     __xdata unsigned char tm = 0;               /* 计时器状态: 0关 1暂停 2运行 */
         __xdata unsigned char tm_sec = 0, tm_min = 0, tm_last = 0; /* 计时 MM:SS + DS1302秒基准 */
 
-    __xdata unsigned char ip_disp = 0;           /* 显示配网 IP 末段 10s */
+    __xdata unsigned char ip_disp = 0;           /* 显示配网 IP 末段 ~3s */
     __xdata unsigned int ip_ticks = 0;
     __xdata unsigned char hb_tick = 0, boot_t = 8, ap_sent = 0;
     __xdata unsigned char both_cnt = 0;          /* 双键同按计时(外循环拍, 满21≈5s) */
