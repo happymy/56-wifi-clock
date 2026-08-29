@@ -30,7 +30,7 @@ void cfg_defaults(void) {
     cfg.off_end[0]   = 0xFF; cfg.off_end[1]   = 0xFF;
     cfg.chime = 0;
     cfg.snooze = 5;
-    cfg.dst = 0;
+    cfg.led_en = 1;           /* 默认开, 保留联网亮灯行为 */
     cfg.smg1_mode = 0;         /* 默认 SMG1 显温度 */
     for (i = 0; i < 6; i++) {
         cfg.rem1[i] = 0; cfg.rem2[i] = 0; cfg.rem3[i] = 0; cfg.rem4[i] = 0; cfg.rem5[i] = 0;

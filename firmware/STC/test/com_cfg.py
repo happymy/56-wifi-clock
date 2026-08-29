@@ -67,7 +67,7 @@ for cmd, pl in frames:
         print("off_end      =", u(16), u(17))
         print("chime        =", u(18))
         print("snooze       =", u(19))
-        print("dst          =", u(20))
+        print("led_en       =", u(20), "(1=开红灯 0=关)")
         print("smg1_mode     =", "温度" if u(21)==0 else "日期")
         print("cd_preset    =", u(52))
         print("temp_unit    =", u(53), "(0=C/1=F)")

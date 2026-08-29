@@ -434,8 +434,8 @@ void main(void) {
             if (off_on) { unsigned char i; for (i = 0; i < 8; i++) disp[i] = 0; }
         }
 
-        /* 状态灯：已联网同步则点亮 */
-        if (net_status >= 2) LED_ON(); else LED_OFF();
+        /* 状态灯：已联网同步则点亮(红灯可由 8266 经 cfg.led_en 关闭) */
+        if (cfg.led_en && net_status >= 2) LED_ON(); else LED_OFF();
 
         blink ^= 1;
         if (bright_adj) {
