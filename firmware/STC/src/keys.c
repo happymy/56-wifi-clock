@@ -51,7 +51,7 @@ void keys_init(void) {
 static void scan_one(unsigned char cur, __xdata kst_t *s, unsigned char btn) {
     if (cur) {
         if (!s->down) {                       /* 按下边沿 */
-            s->down = 1; s->t_down = 0; s->long_fired = 0; s->t_up = 0;
+            s->down = 1; s->t_down = 0; s->long_fired = 0;
             if (s->dbl_pending) { s->dbl_pending = 0; s->second = 1; } /* 进入第二击 */
         }
         s->t_down++;
@@ -77,9 +77,10 @@ void keys_scan(void) {
     unsigned char p1 = pressed(KEY_UP);
     if (p0 && p1) {
         both_hold = 1;
-        /* 双键同按期间吞掉单键状态机：清 down，松手不再误判新单击→进亮度(根因：同按时
-           跳过 scan_one，down 残留而 t_down 不涨)。其余字段下次按下自清。*/
+        /* 双键同按吞掉单键状态机：清 down+dbl_pending，松手不再误判单击/双击→进亮度
+           (根因：同按时跳过 scan_one，down 残留而 t_down 不涨；dbl_pending 残留则超时发单击) */
         st[0].down = st[1].down = 0;
+        st[0].dbl_pending = st[1].dbl_pending = 0;
         return;
     }
     both_hold = 0;
