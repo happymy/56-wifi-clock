@@ -4,7 +4,7 @@
 
 ## 硬件概览
   - **MCU**：STC15W408AS — 1T 8051，内部 IRC 实测 11.051MHz，8KB Flash，512B RAM，5KB 片内 EEPROM（512B/扇区，起始 0x0000，地址空间 0x0000–0x13FF），10-bit ADC(P1.0–P1.7)，3 定时器，INT0/INT1(P3.2/P3.3)。
-  - **CODE 容量已探测确认 = 8KB（8192B）**：5KB EEPROM 为**数据空间**，芯片不能从中取指执行，故无法用于缩减 CODE；仅作 M11 配置持久化。固件区上限 **8192B（8KB Flash）**，当前构建末端 **0x1FCD（8141B）**，余 51B（用户环境 +5~6B 仍过 8192，零错误零告警，SDCC `--opt-code-size`）。计时器（51 原生）已实装、倒计时显示接管移 8266（见 `plan/新版时钟功能.md` §四/§五/§十八 容量取舍）；亮度主用 TM1639 自带 8 档硬件占空比（自动/手动）；极暗档另由 T0 软件 PWM 把有效占空比压到 ≈1/1024（见 AGENTS.md §6）。
+  - **CODE 容量已探测确认 = 8KB（8192B）**：5KB EEPROM 为**数据空间**，芯片不能从中取指执行，故无法用于缩减 CODE；仅作 M11 配置持久化。固件区上限 **8192B（8KB Flash）**，当前构建末端 **0x1FEE（8175B）**，余 17B（用户环境约 +4B → 8179 仍过 8192，零错误零告警，SDCC `--opt-code-size`）。计时器（51 原生）已实装、倒计时显示接管移 8266（见 `plan/新版时钟功能.md` §四/§五/§十八 容量取舍）；亮度主用 TM1639 自带 8 档硬件占空比（自动/手动）；极暗档另由 T0 软件 PWM 把有效占空比压到 ≈1/1024（见 AGENTS.md §6）。
 - **显示**：TM1639 三线驱动 8 位数码管（共阴）：
   - 主行 4 大管 LED2–5 → GRID1–GRID4（`FJ12101AH` 1.2"）：整屏三态，**手动 UP 切换**（单击循环 TIME→DATE→TEMP→TIME，双击恢复走时；无自动整屏轮显）——TIME `HH:MM`（冒号=GRID2/GRID3 小数点，GRID3 倒装）、DATE `MMDD`（月左/日右镜像）、TEMP `[符号][2位温度][C/F]`（NTC 无效兜底 25°C；°F 由 `cfg.temp_unit` 切换）。
   - 下排 `SMG1` → GRID5/6（`5612B` 双位）：TIME 模式由 `smg1_mode`（8266 下发，偏移21）固定选显 **温度 °C / 日期(日 DD)**（0=温度、1=日期，不轮换）；DATE 显星期 1–7；TEMP 灭。**SMG1 凡显温度个位(GRID5)小数点恒亮**。
@@ -83,7 +83,7 @@ STC 芯片靠串口下载，流程是“先点下载、再上电”：
 - ✅ **DS1302 实时时钟 + 断电能走时**（v0.5）：突发读判定 CH 位、上电首读加延时与重试（修复断电清零）、单字节写清 CH 保证连续走时；`ds1302.c/h` 已提交并烧录验证。
 - ✅ **传统手动设置**（v0.5）：SET 单击进入并循环切换字段（时→分→秒→日→月→年→星期），UP 在当前字段加值（独立回绕、闰年感知），末字段 SET 保存+响蜂鸣。
 - ✅ **硬件 UART1 回环验证**（uart-loopback-v0.6 / v0.6）：STC15W408AS 无 Timer1，UART1 改用 Timer2 波特源（9600 8N1），自发自收比对，大屏左发/右收、SMG 显 0/E、串口打印 `TX=.. RX=.. OK/FAIL`。
-- ✅ **51 产品固件（firmware/STC，v1.0.3）**：完整按键语义（SET 单/双/长按、UP 单/双/长按进计时器、双键≥5s 重配网）、配置 54B EEPROM 持久化（IAP 0x0000–0x13FF）、SET_TIME/SET_CFG/NET_STAT/STA_IP/REQ_CFG/REQ_TIME/HEARTBEAT/ENTER_AP/CD_CTRL/DISP_OVERRIDE 协议收发、SMG1 温度/日期选显、闰年感知、倒计时显示接管（DISP_OVERRIDE 驱动）。CODE 余量极小（8141/8192B），改动前必读 `firmware/STC/BUILD.md`。
+- ✅ **51 产品固件（firmware/STC，v1.0.3）**：完整按键语义（SET 单/双/长按、UP 单/双/长按进计时器、双键≥5s 重配网）、配置 54B EEPROM 持久化（IAP 0x0000–0x13FF）、SET_TIME/SET_CFG/NET_STAT/STA_IP/REQ_CFG/REQ_TIME/HEARTBEAT/ENTER_AP/CD_CTRL/DISP_OVERRIDE 协议收发、SMG1 温度/日期选显、闰年感知、大屏整屏自动轮播（`display_mode`）、红色状态灯使能（`led_en`）、倒计时显示接管（DISP_OVERRIDE 驱动）。CODE 余量极小（8175/8192B，余 17B），改动前必读 `firmware/STC/BUILD.md`。
 - ✅ **传感器热敏温度 + 单点补偿**（temp_offset 由 8266 下推）、EEPROM 持久化（IAP）、三组闹钟、状态指示灯重构、计时器（51 原生 MM:SS 封顶 99:59）——均已完成。
 - ⬜ **ESP8266 固件（8266 侧，未实现）**：NTP 校时、Web 配网/配置、STA_IP 推送、倒计时 tick 权威、ACK/NAK/BTN_EVENT/AP_READY 等协议设计命令。51 端已为其预留全部帧与字段，模拟测试脚本见 `firmware/STC/test/uart_8266_sim.py` 与 `plan/8266串口测试计划.md`。
 
