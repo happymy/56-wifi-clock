@@ -10,3 +10,8 @@
 *.lk
 *.rst
 .playwright-mcp/
+
+# 构建产物（SDCC 输出 + 日志）
+firmware/STC/out/
+firmware/STC/build.log
+tools/__pycache__/
