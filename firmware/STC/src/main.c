@@ -240,6 +240,7 @@ void main(void) {
     __xdata unsigned char ip_disp = 0;           /* 显示配网 IP 末段 10s */
     __xdata unsigned int ip_ticks = 0;
     __xdata unsigned char hb_tick = 0, boot_t = 8, ap_sent = 0;
+    __xdata unsigned char both_cnt = 0;          /* 双键同按计时(外循环拍, 满21≈5s) */
     __xdata unsigned int light;
     __xdata int temp_x10;
 
@@ -344,10 +345,10 @@ void main(void) {
             delay_ms(10);
         }
 
-        /* 双键同按 ≥2s：清 STA 凭据 + 重进 AP 配网（一次性） */
+        /* 双键同按 ≥5s：清 STA 凭据 + 重进 AP 配网（一次性, 21外循环×~240ms≈5s） */
         if (key_both_hold()) {
-            if (!ap_sent) { ap_sent = 1; uart_send_null(CMD_ENTER_AP); beep_once(); }
-        } else ap_sent = 0;
+            if (++both_cnt >= 21) { if (!ap_sent) { ap_sent = 1; uart_send_null(CMD_ENTER_AP); beep_once(); } }
+        } else { both_cnt = 0; ap_sent = 0; }
 
         /* 串口帧解析 + 心跳 + 上电 8266 握手窗口 */
         uart_poll();
