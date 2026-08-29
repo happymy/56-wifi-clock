@@ -35,12 +35,7 @@ static void u2bcd(__data unsigned char *out, unsigned char v) {
     while (v >= 10) { v -= 10; q++; }
     out[0] = q; out[1] = v;
 }
-/* 秒→MM:SS */
-static void sec2mmss(unsigned int s, __data unsigned char *mm, __data unsigned char *ss) {
-    unsigned char m = 0;
-    while (s >= 60) { s -= 60; m++; }
-    *mm = m; *ss = (unsigned char)s;
-}
+/* 秒→MM:SS 内联于 cd 运行显示(仅一处调用, 省函数开销) */
 static unsigned char bcd2bin(unsigned char b) {
     unsigned char hi = (b >> 4) & 0x0F, lo = b & 0x0F;
     return (unsigned char)(hi * 8 + hi * 2 + lo);   /* 免 __mulint(29B): hi*10+lo */
@@ -293,8 +288,11 @@ void main(void) {
                     continue;
                 }
                 if (cd_mode) {
-                    if (ke.btn == KEY_UP && ke.ev == EV_SINGLE) {
-                        if (cd_mode == 1) { if (cd_min >= 60) cd_min = 0; cd_min += 1; }   /* 免%60 */
+                    if (ke.btn == KEY_UP && cd_mode == 1) {
+                        if (ke.ev == EV_SINGLE)    { if (cd_min >= 99) cd_min = 0; cd_min++; }   /* 单击 +1 */
+                        else {                                                               /* 长按 +10(__data 免整型库) */
+                            unsigned char m = cd_min; m += 10; if (m >= 100) m = 99; cd_min = m;
+                        }
                     } else if (ke.btn == KEY_SET && ke.ev == EV_SINGLE) {
                         if (cd_mode == 1) { cd_mode = 2; cd_ticks = (unsigned int)cd_min * 240u; cfg.cd_preset = cd_min; }
                         else { cd_mode = 0; cd_ring = 0; BEEP_OFF(); }
@@ -432,7 +430,8 @@ void main(void) {
             if (blink) { disp[0] = disp[1] = disp[2] = disp[3] = 0; }
         } else if (cd_mode == 2) {
             unsigned int sec = cd_ticks / 4u;
-            unsigned char mm, ss; sec2mmss(sec, &mm, &ss);
+            unsigned char mm = 0; while (sec >= 60) { sec -= 60; mm++; }
+            unsigned char ss = (unsigned char)sec;
             put_mmss(disp, mm, ss);
         } else if (ip_disp) {
             unsigned char v = sta_ip_last, h = 0, t = 0, o = v;  /* P + 末段(0-255) */
