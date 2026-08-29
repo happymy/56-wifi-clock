@@ -31,7 +31,7 @@ void cfg_defaults(void) {
     cfg.chime = 0;
     cfg.snooze = 5;
     cfg.dst = 0;
-    cfg.cycle_flags = 0x03;    /* 温度+日期 均轮显 */
+    cfg.smg1_mode = 0;         /* 默认 SMG1 显温度 */
     for (i = 0; i < 6; i++) {
         cfg.rem1[i] = 0; cfg.rem2[i] = 0; cfg.rem3[i] = 0; cfg.rem4[i] = 0; cfg.rem5[i] = 0;
     }

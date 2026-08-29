@@ -44,17 +44,17 @@ void disp_render(unsigned char mode, const __xdata ds_time *t, int temp_x10,
         disp[2] = seg_rotate180(seg_font[deg % 10]);   /* 个位 (GRID3 倒装, 须旋转) */
         disp[3] = (cfg.temp_unit != 0) ? 0x71 : 0x39;  /* 单位 F / C */
         /* SMG1/SMG2 灭: 整屏清屏已置 0 */
-    } else { /* DISP_TIME: 大屏 HH:MM, 小时/分十位带小数点作冒号; SMG1 由 smg1_sel 选 温度/星期 */
+    } else { /* DISP_TIME: 大屏 HH:MM, 小时/分十位带小数点作冒号; SMG1 由 smg1_sel 选 温度/日期 */
         disp[0] = seg_font[(t->hr >> 4) & 0x0F];
         disp[1] = seg_font[t->hr & 0x0F] | 0x80;
         disp[2] = seg_rotate180(seg_font[(t->min >> 4) & 0x0F] | 0x80);  /* GRID3 倒装, dp 作冒号下点 */
         disp[3] = seg_font[t->min & 0x0F];
         put_smg2(disp, (t->sec >> 4) & 0x0F, (t->sec & 0x0F));
-        if (smg1_sel == 0) {          /* SMG1=温度(整°C), 个位(GRID5)小数点亮(无论是否轮换) */
+        if (smg1_sel == 0) {          /* SMG1=温度(整°C), 个位(GRID5)小数点亮 */
             unsigned char td = abs_div10(temp_x10);
             disp[5] = seg_font[td / 10]; disp[4] = seg_font[td % 10] | 0x80;
-        } else {                      /* SMG1=星期 1-7(不补零) */
-            disp[5] = seg_font[t->weekday & 0x0F]; disp[4] = 0;
+        } else {                      /* SMG1=日期(日 DD, BCD 2位) */
+            disp[5] = seg_font[(t->date >> 4) & 0x0F]; disp[4] = seg_font[t->date & 0x0F];
         }
     }
 }

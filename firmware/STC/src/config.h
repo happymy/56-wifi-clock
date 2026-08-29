@@ -16,7 +16,7 @@ typedef struct {
     unsigned char chime;             /* 整点报时 0=关 1=开 2=半点也报 */
     unsigned char snooze;            /* 贪睡 0=关 5/10=分钟 */
     unsigned char dst;               /* 夏令时 0=无 1=欧美自动 */
-    unsigned char cycle_flags;       /* bit0=温度轮显 bit1=日期轮显 */
+    unsigned char smg1_mode;         /* SMG1 选显: 0=温度 1=日期(8266 配置, 不轮换) */
     unsigned char rem1[6];           /* 事项提醒①（§6 结构） */
     unsigned char rem2[6];
     unsigned char rem3[6];

@@ -232,8 +232,8 @@ void main(void) {
     __xdata unsigned char disp[8];
     __xdata ds_time t, t_set;
     __xdata key_ev_t ke;
-    __xdata unsigned char mode = DISP_TIME, cyc = 0, blink = 0, smg1_rot = 0;
-    /* mode: 整屏主模式(手动UP切); smg1_rot: 走时SMG1选显 0=温度 1=星期 */
+    __xdata unsigned char mode = DISP_TIME, blink = 0, smg1_rot = 0;
+    /* mode: 整屏主模式(手动UP切); smg1_rot: 走时SMG1选显 0=温度 1=日期(由 cfg.smg1_mode, 不轮换) */
     __xdata unsigned char bright_adj = 0, adj_val = 0;
     __xdata unsigned char tset_mode = 0, tset_idx = 0;
     __xdata unsigned char last_min = 0xFF;
@@ -338,7 +338,7 @@ void main(void) {
                             case 5: inc_date(&t_set); break;
                         }
                     }
-                } else {  /* 常态: SET 控亮度/时间设置/IP; UP 手动切整屏模式; 走时SMG1轮换仅 8266 */
+                } else {  /* 常态: SET 控亮度/时间设置/IP; UP 手动切整屏模式; 走时SMG1选显(温度/日期)由 8266 配置 */
                     if (ke.btn == KEY_SET && ke.ev == EV_SINGLE) {
                         bright_adj = 1; adj_val = (cfg.bright_mode == 0) ? 0 : cfg.bright_lvl;
                     } else if (ke.btn == KEY_SET && ke.ev == EV_LONG) {
@@ -457,14 +457,10 @@ void main(void) {
         }
         tm1639_write_display(disp);
 
-        /* 走时: 大屏恒 HH:MM; SMG1 按 cycle_flags 子轮换 温度/星期(仅 8266 开关; 手动模式不轮换) */
+        /* 走时: 大屏恒 HH:MM; SMG1 由 cfg.smg1_mode 固定选 温度/日期(8266 配置, 不轮换) */
         if (mode == DISP_TIME && !bright_adj && !tset_mode
             && !tm && !cd_disp && !ip_disp) {
-            unsigned char f = cfg.cycle_flags;
-            if ((f & 3) == 3) { if (++cyc >= 12) { cyc = 0; smg1_rot ^= 1; } }
-            else if (f & 1) smg1_rot = 0;          /* 仅温度轮显 */
-            else if (f & 2) smg1_rot = 1;          /* 仅日期轮显 */
-            else smg1_rot = 0;                     /* 均未勾选: 默认显温度 */
+            smg1_rot = (cfg.smg1_mode != 0);       /* 0=温度 1=日期 */
         }
     }
 }
