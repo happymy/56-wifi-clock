@@ -49,8 +49,8 @@ void keys_init(void) {
 static void scan_one(unsigned char cur, __xdata kst_t *s, unsigned char btn) {
     if (cur) {
         if (!s->down) {                       /* 按下边沿 */
-            s->down = 1; s->t_down = 0; s->long_fired = 0;
-            if (s->dbl_pending) { s->dbl_pending = 0; emit(btn, EV_DOUBLE); s->down = 0; } /* 第二击→双击, 假装已松防尾随单击 */
+            s->down = 1; s->t_down = 0;
+            if (s->dbl_pending) { s->dbl_pending = 0; emit(btn, EV_DOUBLE); s->down = 0; s->long_fired = 1; } /* 双击: 标已双, 防松手尾随单击 */
         }
         s->t_down++;
         if (!s->long_fired && s->t_down >= LONG_CNT) {
@@ -59,7 +59,7 @@ static void scan_one(unsigned char cur, __xdata kst_t *s, unsigned char btn) {
     } else {
         if (s->down) {                        /* 松开边沿 */
             s->down = 0; s->t_up = 0;
-            if (s->long_fired) { s->long_fired = 0; return; }      /* 长按已处理 */
+            if (s->long_fired) { s->long_fired = 0; return; }      /* 长按/已双: 清标记, 不发单击 */
             s->dbl_pending = 1;                                   /* 第一击→待第二击 */
         } else {
             if (s->dbl_pending && ++s->t_up >= DBL_CNT) {
