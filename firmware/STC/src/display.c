@@ -14,7 +14,8 @@ static void put_smg2(__xdata unsigned char *d, unsigned char hi, unsigned char l
 /* |v|/10（温度×10→整°C），×26>>8 近似免循环；夹断2位(护°F≥100°F时deg/10越界)。SMG1与整屏温度共用 */
 static unsigned char abs_div10(int v) {
     unsigned int a = (v < 0) ? (unsigned int)(-v) : (unsigned int)v;
-    unsigned char d = (unsigned char)((a * 26) >> 8);
+    unsigned char d = 0;
+    while (a >= 10) { a -= 10; d++; }   /* |v|/10: 免 16 位乘/除库(deg/10、deg%10 为 8 位, SDCC 内联) */
     if (d > 99) d = 99;
     return d;
 }
