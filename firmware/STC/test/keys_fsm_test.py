@@ -1,11 +1,11 @@
 # keys.c 按键状态机 PC 验证（与固件同算法）。验证 单击/双击/长按。
 KEY_SET, KEY_UP = 0, 1
 EV_SINGLE, EV_DOUBLE, EV_LONG = 1, 2, 3
-LONG_CNT, DBL_CNT, QSIZE = 50, 15, 6
+LONG_CNT, DBL_CNT, QSIZE = 100, 15, 6  # 与 firmware/STC/src/keys.c 一致
 
 class K:
     def __init__(s):
-        s.down=s.t_down=s.t_up=s.long_fired=s.dbl_pending=s.second=0
+        s.down=s.t_down=s.t_up=s.long_fired=s.dbl_pending=0
 
 p3 = 0x0C  # P3.2=UP(0x04) P3.3=SET(0x08) 默认高=未按下
 q=[]; qh=0; qt=0; qc=0; both=0
@@ -23,17 +23,16 @@ def emit(b,e):
 def scan_one(cur,s,btn):
     if cur:
         if not s.down:
-            s.down=1; s.t_down=0; s.long_fired=0; s.t_up=0
-            if s.dbl_pending: s.dbl_pending=0; s.second=1
+            s.down=1; s.t_down=0
+            if s.dbl_pending: s.dbl_pending=0; emit(btn,EV_DOUBLE); s.down=0; s.long_fired=1
         s.t_down+=1
         if not s.long_fired and s.t_down>=LONG_CNT:
-            emit(btn,EV_LONG); s.long_fired=1; s.second=0
+            emit(btn,EV_LONG); s.long_fired=1
     else:
         if s.down:
             s.down=0; s.t_up=0
-            if s.long_fired: s.second=0; return
-            if s.second: emit(btn,EV_DOUBLE); s.second=0
-            else: s.dbl_pending=1
+            if s.long_fired: s.long_fired=0; return
+            s.dbl_pending=1
         else:
             if s.dbl_pending:
                 s.t_up += 1
@@ -85,7 +84,7 @@ reset(); drive(3,1,0); drive(5,0,0); drive(3,1,0); drive(25,0,0)
 evs=drain()
 print('UP double :', evs, 'OK' if evs==[(KEY_UP,EV_DOUBLE)] else 'FAIL'); fail+= 0 if evs==[(KEY_UP,EV_DOUBLE)] else 1
 # 长按 UP
-reset(); drive(60,1,0); drive(5,0,0)
+reset(); drive(120,1,0); drive(5,0,0)
 evs=drain()
 print('UP long   :', evs, 'OK' if evs==[(KEY_UP,EV_LONG)] else 'FAIL'); fail+= 0 if evs==[(KEY_UP,EV_LONG)] else 1
 # 单击 SET

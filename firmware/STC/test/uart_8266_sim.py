@@ -7,6 +7,12 @@
     [0xAA][0x55][CMD][LEN][PAYLOAD...][CHK]
     CHK = XOR(CMD, LEN, PAYLOAD[0..LEN-1])
 
+命令码严格对齐 firmware/STC/src/main.c（51 当前已实现）：
+    0x01 REQ_TIME(MCU→)  0x02 HEARTBEAT(MCU→)  0x04 ENTER_AP(MCU→)
+    0x05 CD_CTRL(MCU→)   0x81 SET_TIME(←)       0x82 SET_CFG(双向)
+    0x83 NET_STAT(←)     0x87 REQ_CFG(←)        0x88 STA_IP(←)
+    0x89 DISP_OVERRIDE(←) 0x8F BOOT(←)
+
 依赖：pip install pyserial
 用法：
     python uart_8266_sim.py monitor  COM3
@@ -15,7 +21,13 @@
     python uart_8266_sim.py send     COM3 81 0812240312345008
     python uart_8266_sim.py settime  COM3 12:34:56 --tz 8
     python uart_8266_sim.py setcfg   COM3 cfg.bin
+    python uart_8266_sim.py setcfg   COM3 --smg1 1 --temp-unit 1
     python uart_8266_sim.py staip    COM3 192.168.1.10
+    python uart_8266_sim.py cd       COM3 on 01 30      # DISP_OVERRIDE 倒计时接管 MM:SS
+    python uart_8266_sim.py cd       COM3 off           # DISP_OVERRIDE 释放
+    python uart_8266_sim.py cd       COM3 beep          # DISP_OVERRIDE 归零响铃
+    python uart_8266_sim.py cdctrl   COM3 0             # CD_CTRL 暂停/恢复
+    python uart_8266_sim.py cdctrl   COM3 1             # CD_CTRL 取消
 详见 plan/8266串口测试计划.md。
 """
 import sys
@@ -35,14 +47,14 @@ BAUD = 9600
 CMD_REQ_TIME  = 0x01
 CMD_HEARTBEAT = 0x02
 CMD_ENTER_AP  = 0x04
+CMD_CD_CTRL   = 0x05   # MCU→ESP: 倒计时控制(0=暂停/恢复,1=取消)
 CMD_SET_TIME  = 0x81
 CMD_SET_CFG   = 0x82
 CMD_NET_STAT  = 0x83
 CMD_REQ_CFG   = 0x87
 CMD_STA_IP    = 0x88
+CMD_DISP_OVERRIDE = 0x89  # ESP→MCU: 显示接管(倒计时/响铃)
 CMD_BOOT      = 0x8F
-CMD_ACK       = 0x85
-CMD_NAK       = 0x86
 
 NAME = {v: k for k, v in list(globals().items()) if k.startswith("CMD_")}
 
@@ -65,7 +77,7 @@ def now_set_time_payload(tz=8):
     t = datetime.datetime.now()
     wd = (t.isoweekday() % 7) + 1  # DS1302: 1=周日..7=周六
     return bytes([bcd(t.year % 100), bcd(t.month), bcd(t.day), bcd(wd),
-                  bcd(t.hour), bcd(t.minute), bcd(t.second), tz & 0xFF])
+                   bcd(t.hour), bcd(t.minute), bcd(t.second), tz & 0xFF])
 
 
 class Parser:
@@ -159,6 +171,8 @@ class Sim:
             p = now_set_time_payload()
             print("  TX", fmt_frame(CMD_SET_TIME, p))
             self.ser.write(encode(CMD_SET_TIME, p))
+        elif cmd == CMD_CD_CTRL:
+            print("    (51 发来倒计时控制 val=%d)" % (payload[0] if payload else -1))
 
     def send(self, cmd, payload=b""):
         f = encode(cmd, payload)
@@ -218,8 +232,6 @@ def cmd_send(args):
 def cmd_settime(args):
     sim = Sim(args.port, args.baud)
     h, m, s = args.time.split(":")
-    payload = bytes([bcd(h), bcd(m), bcd(s)])  # 占位，下面重排
-    # 用完整 8 字节（含日期/星期/tz）更准确
     import datetime
     t = datetime.datetime.now()
     wd = (t.isoweekday() % 7) + 1
@@ -234,13 +246,17 @@ def cmd_setcfg(args):
     sim = Sim(args.port, args.baud)
     if args.file:
         with open(args.file, "rb") as f:
-            data = f.read(54)
+            data = bytearray(f.read(54))
         if len(data) < 54:
             data = data + bytes(54 - len(data))
     else:
-        data = bytes(54)
-    sim.our_cfg = data
-    sim.send(CMD_SET_CFG, data)
+        data = bytearray(54)
+    if args.smg1 is not None:
+        data[21] = args.smg1 & 0xFF        # smg1_mode @ 偏移21（0=温度 1=日期）
+    if args.temp_unit is not None:
+        data[53] = args.temp_unit & 0xFF    # temp_unit @ 偏移53（0=°C 1=°F）
+    sim.our_cfg = bytes(data)
+    sim.send(CMD_SET_CFG, bytes(data))
     time.sleep(0.3)
     sim.close()
 
@@ -251,6 +267,27 @@ def cmd_staip(args):
     if len(octets) != 4:
         sys.exit("IP 格式应为 a.b.c.d")
     sim.send(CMD_STA_IP, bytes(octets))
+    time.sleep(0.3)
+    sim.close()
+
+
+def cmd_cd(args):
+    sim = Sim(args.port, args.baud)
+    if args.mode == "off":
+        sim.send(CMD_DISP_OVERRIDE, bytes([0]))
+    elif args.mode == "beep":
+        sim.send(CMD_DISP_OVERRIDE, bytes([2]))
+    else:  # on MM SS（十六进制）
+        mm = int(args.mm, 16) if args.mm else 0
+        ss = int(args.ss, 16) if args.ss else 0
+        sim.send(CMD_DISP_OVERRIDE, bytes([1, mm & 0xFF, ss & 0xFF]))
+    time.sleep(0.3)
+    sim.close()
+
+
+def cmd_cdctrl(args):
+    sim = Sim(args.port, args.baud)
+    sim.send(CMD_CD_CTRL, bytes([args.val & 0xFF]))
     time.sleep(0.3)
     sim.close()
 
@@ -283,10 +320,25 @@ def main():
     p = sub.add_parser("setcfg", help="发送 SET_CFG(0x82) 54 字节配置")
     p.add_argument("port"); p.add_argument("file", nargs="?",
                    help="可选 .bin 配置文件（不足 54B 补零）")
+    p.add_argument("--smg1", type=int, choices=[0, 1],
+                   help="smg1_mode @ 偏移21：0=温度 1=日期")
+    p.add_argument("--temp-unit", dest="temp_unit", type=int, choices=[0, 1],
+                   help="temp_unit @ 偏移53：0=°C 1=°F")
     p.set_defaults(func=cmd_setcfg)
 
     p = sub.add_parser("staip", help="发送 STA_IP(0x88) 供双击 SET 显示 P+IP末段")
     p.add_argument("port"); p.add_argument("ip"); p.set_defaults(func=cmd_staip)
+
+    p = sub.add_parser("cd", help="发送 DISP_OVERRIDE(0x89) 倒计时显示接管")
+    p.add_argument("port"); p.add_argument("mode", choices=["on", "off", "beep"])
+    p.add_argument("mm", nargs="?", help="on 模式 MM(十六进制)")
+    p.add_argument("ss", nargs="?", help="on 模式 SS(十六进制)")
+    p.set_defaults(func=cmd_cd)
+
+    p = sub.add_parser("cdctrl", help="发送 CD_CTRL(0x05) 倒计时控制(设备键 P2 下发)")
+    p.add_argument("port"); p.add_argument("val", type=int, choices=[0, 1],
+                   help="0=暂停/恢复 1=取消")
+    p.set_defaults(func=cmd_cdctrl)
 
     args = ap.parse_args()
     args.func(args)

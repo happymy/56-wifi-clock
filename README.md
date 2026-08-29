@@ -83,9 +83,9 @@ STC 芯片靠串口下载，流程是“先点下载、再上电”：
 - ✅ **DS1302 实时时钟 + 断电能走时**（v0.5）：突发读判定 CH 位、上电首读加延时与重试（修复断电清零）、单字节写清 CH 保证连续走时；`ds1302.c/h` 已提交并烧录验证。
 - ✅ **传统手动设置**（v0.5）：SET 单击进入并循环切换字段（时→分→秒→日→月→年→星期），UP 在当前字段加值（独立回绕、闰年感知），末字段 SET 保存+响蜂鸣。
 - ✅ **硬件 UART1 回环验证**（uart-loopback-v0.6 / v0.6）：STC15W408AS 无 Timer1，UART1 改用 Timer2 波特源（9600 8N1），自发自收比对，大屏左发/右收、SMG 显 0/E、串口打印 `TX=.. RX=.. OK/FAIL`。
-- ⬜ 传感器热敏温度 + 补偿、EEPROM 持久化（IAP 5K/0x0000）
-- ⬜ ESP8266 串口配网 / NTP 校时（UART 收发原语 `uart_send`/`uart_recv` 已就绪，可作为接 ESP 的基础）
-- ⬜ 按键产品语义（SET 单/双/长按设置、三组闹钟）、状态指示灯人性化重构
+- ✅ **51 产品固件（firmware/STC，v1.0.3）**：完整按键语义（SET 单/双/长按、UP 单/双/长按进计时器、双键≥5s 重配网）、配置 54B EEPROM 持久化（IAP 0x0000–0x13FF）、SET_TIME/SET_CFG/NET_STAT/STA_IP/REQ_CFG/REQ_TIME/HEARTBEAT/ENTER_AP/CD_CTRL/DISP_OVERRIDE 协议收发、SMG1 温度/日期选显、闰年感知、倒计时显示接管（DISP_OVERRIDE 驱动）。CODE 余量极小（8141/8192B），改动前必读 `firmware/STC/BUILD.md`。
+- ✅ **传感器热敏温度 + 单点补偿**（temp_offset 由 8266 下推）、EEPROM 持久化（IAP）、三组闹钟、状态指示灯重构、计时器（51 原生 MM:SS 封顶 99:59）——均已完成。
+- ⬜ **ESP8266 固件（8266 侧，未实现）**：NTP 校时、Web 配网/配置、STA_IP 推送、倒计时 tick 权威、ACK/NAK/BTN_EVENT/AP_READY 等协议设计命令。51 端已为其预留全部帧与字段，模拟测试脚本见 `firmware/STC/test/uart_8266_sim.py` 与 `plan/8266串口测试计划.md`。
 
 ## 版本里程碑
 | Tag | 说明 |
@@ -96,6 +96,7 @@ STC 芯片靠串口下载，流程是“先点下载、再上电”：
 | v0.4 / restructure | 整理项目结构，测试代码归入 demo，固件按 MCU 分目录 |
 | v0.5 / ds1302-v0.5-timekeeping | DS1302 走时 + 断电保持 + 传统手动设置完成 |
 | v0.6 / uart-loopback-v0.6 | 硬件串口回环测试固件完成 |
+| v1.0.3 / wifi-clock-51 | 51 产品固件完成：按键语义/配置持久化/串口协议/SMG1/计时器/倒计时接管；配套 8266 模拟测试脚本 |
 
 详细复刻路线见 `plan/固件复刻计划.md`。
 

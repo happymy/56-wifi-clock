@@ -17,7 +17,7 @@ def bcd(v):
 now = time.localtime()
 payload = bytes([
     bcd(now.tm_year % 100), bcd(now.tm_mon), bcd(now.tm_mday),
-    bcd(now.tm_wday + 1),    # 固件约定 周一=1..周日=7
+    bcd(((now.tm_wday + 1) % 7) + 1),  # DS1302 约定: 1=周日..7=周六
     bcd(now.tm_hour), bcd(now.tm_min), bcd(now.tm_sec), 0x08,
 ])
 print("set:", time.strftime("%Y-%m-%d %H:%M:%S", now), "weekday", now.tm_wday + 1)

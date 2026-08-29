@@ -50,7 +50,7 @@ for cmd, pl in frames:
 
 # 解码 cfg (54B) 按 config.h 布局
 for cmd, pl in frames:
-    if cmd == 0x04 and len(pl) == 54:
+    if cmd == 0x82 and len(pl) == 54:
         d = pl
         def u(o): return d[o]
         def s(o): return d[o] - 256 if d[o] & 0x80 else d[o]
