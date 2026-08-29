@@ -6,14 +6,8 @@
    SMG2(GRID7/8)：左=十位(disp[7]) 右=个位(disp[6])。GRID3(disp[2]) 倒装→seg_rotate180。
    DS1302 字段为 BCD：十位=高4位, 个位=低4位, 直取避免运算。 */
 
-static void put_smg1(__xdata unsigned char *d, unsigned char hi, unsigned char lo) {
-    d[5] = seg_font[hi]; d[4] = seg_font[lo];   /* 左=十位 右=个位 */
-}
 static void put_smg2(__xdata unsigned char *d, unsigned char hi, unsigned char lo) {
     d[7] = seg_font[hi]; d[6] = seg_font[lo];   /* 左=十位 右=个位 */
-}
-static void clear_smg(__xdata unsigned char *d) {
-    d[4] = d[5] = d[6] = d[7] = 0;
 }
 
 /* v = 温度×10(有符号)。ponytail: 免除法库——先循环除以10得整数度, 再 *26>>8 拆十位/个位(0-60 内精确) */
@@ -45,11 +39,18 @@ void disp_render(unsigned char mode, const __xdata ds_time *t, int temp_x10,
         disp[5] = seg_font[t->weekday & 0x0F];
         disp[4] = 0;
     } else if (mode == DISP_TEMP) {
-        bin2(disp, temp_x10, (temp_x10 < 0) ? 1 : 0);
-        disp[2] = 0; disp[3] = 0;   /* 清日期模式 put_big2 残留 GRID3/4 */
-        disp[1] |= 0x80;            /* 温度个位 dp 表 °C */
-        clear_smg(disp);
-        (void)unit_c;
+        int v = temp_x10;
+        if (v <= -990) v = 250;                 /* NTC 开路/短接: 兜底 25.0°C, 防乱码 */
+        unsigned char is_f = (unit_c != 0);
+        if (is_f) v = v + (v >> 1) + (v >> 2) + (v >> 4) + 320;  /* °C→°F(×10), 仅移位近似 */
+        unsigned char neg = (v < 0);
+        unsigned char mag = (unsigned char)(neg ? -v : v);
+        if (mag > 99) mag = 99;                 /* 超出夹断 */
+        disp[0] = neg ? 0x40 : 0;               /* 负号或空 */
+        disp[1] = seg_font[mag / 10];           /* 十位 (复用 bin2 已链入的除法库) */
+        disp[2] = seg_font[mag % 10];           /* 个位 */
+        disp[3] = is_f ? 0x31 : 0x39;           /* 单位 F / C */
+        /* SMG1/SMG2 灭: disp_render 开头整体清屏已置 0 */
     } else { /* DISP_TIME: 大屏 HH:MM, 小时个位带小数点作冒号 */
         disp[2] = 0;                 /* DISP_TEMP 分支不清 GRID3，这里复位避免残留段 */
         disp[0] = seg_font[(t->hr >> 4) & 0x0F];
