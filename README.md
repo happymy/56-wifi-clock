@@ -66,6 +66,7 @@ build.bat            :: 生成 demo/ds1302-clock/out/firmware.hex
 ```
 
 > 其它 demo（`clock-bringup`、`uart-test`）同理：进入对应目录运行 `build.bat`。
+> 产品固件（51 端，`firmware/STC`）构建环境与尺寸红线见 **`firmware/STC/BUILD.md`**（CODE 上限 8192B、当前余量极小，改动前必读）。
 
 ## 烧录（冷启动 ISP）
 STC 芯片靠串口下载，流程是“先点下载、再上电”：
