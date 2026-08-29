@@ -14,4 +14,7 @@
 # 构建产物（SDCC 输出 + 日志）
 firmware/STC/out/
 firmware/STC/build.log
-tools/__pycache__/
+
+# Python 缓存（任意位置）
+__pycache__/
+*.pyc
