@@ -162,7 +162,7 @@ static void uart_send_frame(unsigned char cmd, __xdata unsigned char *p, unsigne
 static __xdata unsigned char tx1[1];
 static void uart_send1(unsigned char c, unsigned char v) { tx1[0] = v; uart_send_frame(c, tx1, 1); }
 
-#define URX_LEN 32
+#define URX_LEN 32   /* XRAM仅256B, 环不能大; 改由高频轮询(uart_poll放内层10ms循环)防59B SET_CFG帧溢出丢头 */
 static __xdata unsigned char urx[URX_LEN];
 static volatile __xdata unsigned char urx_w = 0, urx_r = 0;
 void uart_isr(void) __interrupt(4) {
@@ -286,6 +286,7 @@ void main(void) {
         unsigned char k;
         for (k = 0; k < 24; k++) {
             keys_scan();
+            uart_poll();   /* 高频轮询: 10ms级, 两轮间<12字节, 32B环不溢出, SET_CFG(59B)分段收全 */
             while (key_get(&ke)) {
                 /* 响铃/贪睡中：任意键处理停止与贪睡 */
                 if (ring_alarm || snooze_ticks) {
