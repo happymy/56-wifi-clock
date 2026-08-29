@@ -105,9 +105,9 @@ static void render_setting(__xdata unsigned char *disp, const __xdata ds_time *t
 /* 大屏显示 MM:SS（倒计时/计时器共用） */
 static void put_mmss(__xdata unsigned char *disp, unsigned char mm, unsigned char ss) {
     unsigned char b[2]; u2bcd(b, mm);
-    disp[0] = seg_font[b[0]]; disp[1] = seg_font[b[1]];
+    disp[0] = seg_font[b[0]]; disp[1] = seg_font[b[1]] | 0x80;   /* GRID2 dp = 冒号上点 */
     u2bcd(b, ss);
-    disp[2] = seg_rotate180(seg_font[b[0]]); disp[3] = seg_font[b[1]];
+    disp[2] = seg_rotate180(seg_font[b[0]] | 0x80); disp[3] = seg_font[b[1]];  /* GRID3 倒装, dp = 冒号下点 */
     disp[4] = disp[5] = disp[6] = disp[7] = 0;
 }
 
