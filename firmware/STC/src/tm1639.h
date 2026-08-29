@@ -18,6 +18,7 @@ void tm1639_set_light(unsigned int light); /* 自动亮度: 光敏 0..1023 → �
 
 extern const unsigned char seg_font[16]; /* 共阴 0-9, A-F */
 #define SEG_P 0x73   /* 'P' 字形(a,b,e,f,g)，配网/IP 提示用 */
+#define SEG_L 0x18   /* 'L' 字形(d,e)，亮度档位指示 */
 unsigned char seg_rotate180(unsigned char d); /* 倒装管段码旋转 180° */
 
 #endif

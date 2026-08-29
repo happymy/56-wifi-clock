@@ -18,7 +18,7 @@ static void delay_ms(unsigned int ms) {
         for (j = 0; j < 1200; j++);
 }
 
-static void beep_once(void) { BEEP_ON(); delay_ms(150); BEEP_OFF(); }
+static void beep_once(void) { BEEP_ON(); delay_ms(150); BEEP_OFF(); delay_ms(120); }
 
 /* 10 位 ADC 查询读：ch0=P1.0 光敏, ch1=P1.1 热敏 */
 static unsigned int adc_read(unsigned char ch) {
@@ -68,15 +68,15 @@ static void apply_bright(unsigned int light) {
     else tm1639_set_brightness((unsigned char)(cfg.bright_lvl - 1));
 }
 
-/* 亮度调节：大屏闪显档位(0=自动,1..8=手动) */
+/* 亮度调节：大屏显 "Lnn"（L=亮度档位指示，nn=0-8） */
 static void render_bright_adj(__xdata unsigned char *disp, unsigned char val, unsigned char blank) {
-    unsigned char i;
+    unsigned char i, b[2];
     for (i = 0; i < 8; i++) disp[i] = 0;
     if (!blank) {
-        unsigned char b[2]; u2bcd(b, val);
+        u2bcd(b, val);
+        disp[0] = SEG_L;
         disp[1] = seg_font[b[0]];
-        disp[3] = seg_font[b[1]];
-        disp[2] = seg_rotate180(seg_font[b[1]]);
+        disp[2] = seg_rotate180(seg_font[b[1]]);   /* GRID3 倒装 */
     }
 }
 
@@ -136,6 +136,8 @@ static int ntc_temp_x10(unsigned int raw) {
 #define CMD_REQ_CFG   0x87
 #define CMD_STA_IP    0x88
 #define CMD_BOOT      0x8F
+#define CMD_CD_CTRL        0x05   /* MCU→ESP: 倒计时控制(0=暂停/恢复,1=取消) */
+#define CMD_DISP_OVERRIDE  0x89   /* ESP→MCU: 覆盖显示(倒计时/响铃) */
 
 static void uart_init(void) {
     SCON = 0x50;                 /* 8N1, REN=1（复用 demo/ds1302-clock 验证配置） */
@@ -160,6 +162,10 @@ static void uart_send_frame(unsigned char cmd, __xdata unsigned char *p, unsigne
 /* 空载荷帧: 传 0 指针（循环 0 次），避免通用指针开销 */
 #define uart_send_null(cmd) uart_send_frame(cmd, (__xdata unsigned char *)0, 0)
 
+/* 单字节载荷帧: 复用专用缓冲, 避免栈指针(通用指针库) */
+static __xdata unsigned char tx1[1];
+static void uart_send1(unsigned char c, unsigned char v) { tx1[0] = v; uart_send_frame(c, tx1, 1); }
+
 #define URX_LEN 32
 static __xdata unsigned char urx[URX_LEN];
 static volatile __xdata unsigned char urx_w = 0, urx_r = 0;
@@ -175,6 +181,10 @@ static __xdata ds_time tscr;            /* apply_set_time 暂存, 避开栈 over
 static unsigned char esp_online = 0;
 volatile unsigned char net_status = 0;   /* 网络状态(0未连..3已同步), UART 赋值 */
 unsigned char clock_ok = 1;               /* 1=DS1302 走时有效(CH=0) */
+
+/* 8266 倒计时显示接管：DISP_OVERRIDE 帧写入, main 渲染/按键读取 */
+static __xdata unsigned char cd_disp = 0;          /* 1=大屏显示 8266 倒计时 */
+static __xdata unsigned char cd_mm = 0, cd_ss = 0; /* 8266 推来的剩余 MM:SS */
 
 static void apply_set_time(__xdata unsigned char *p) {
     tscr.year = p[0]; tscr.month = p[1]; tscr.date = p[2]; tscr.weekday = p[3];
@@ -197,6 +207,13 @@ static void uart_dispatch(unsigned char cmd, __xdata unsigned char *p, unsigned 
         case CMD_NET_STAT: if (esp_online && len >= 1) net_status = p[0]; break;
         case CMD_STA_IP:   if (esp_online && len >= 4) sta_ip_last = p[3]; break;
         case CMD_REQ_CFG:  if (esp_online) uart_send_frame(CMD_SET_CFG, (__xdata unsigned char *)&cfg, 54); break;
+        case CMD_DISP_OVERRIDE:  /* 8266 倒计时显示接管 */
+            if (esp_online && len >= 1) {
+                if (p[0] == 0) cd_disp = 0;
+                else if (p[0] == 1 && len >= 3) { cd_disp = 1; cd_mm = p[1]; cd_ss = p[2]; }
+                else if (p[0] == 2) { beep_once(); beep_once(); beep_once(); }  /* 倒计时归零响铃 */
+            }
+            break;
         default: break;
     }
 }
@@ -224,7 +241,8 @@ void main(void) {
     __xdata unsigned char disp[8];
     __xdata ds_time t, t_set;
     __xdata key_ev_t ke;
-    __xdata unsigned char mode = DISP_TIME, cyc = 0, blink = 0;
+    __xdata unsigned char mode = DISP_TIME, cyc = 0, blink = 0, smg1_rot = 0;
+    /* mode: 整屏主模式(手动UP切); smg1_rot: 走时SMG1选显 0=温度 1=星期 */
     __xdata unsigned char bright_adj = 0, adj_val = 0;
     __xdata unsigned char tset_mode = 0, tset_idx = 0;
     __xdata unsigned char last_min = 0xFF;
@@ -232,11 +250,9 @@ void main(void) {
     __xdata unsigned int  ring_ticks = 0;        /* 当前响铃剩余 250ms 拍 */
     __xdata unsigned int  snooze_ticks = 0;     /* 贪睡倒计时(拍) */
     __xdata unsigned char snooze_idx = 0;       /* 贪睡对应的闹钟索引 */
-    __xdata unsigned char cd_mode = 0;          /* 0关 1设定 2运行 */
-    __xdata unsigned char cd_min = 5;           /* 倒计时设定分钟 */
-    __xdata unsigned int  cd_ticks = 0;         /* 运行剩余拍 */
-    __xdata unsigned char cd_ring = 0;          /* 归零后响铃拍 */
-    __xdata unsigned char mode_manual = 0;      /* 1=手动锁定显示模式 */
+    __xdata unsigned char tm = 0;               /* 计时器状态: 0关 1暂停 2运行 */
+        __xdata unsigned char tm_sec = 0, tm_min = 0, tm_last = 0; /* 计时 MM:SS + DS1302秒基准 */
+
     __xdata unsigned char ip_disp = 0;           /* 显示配网 IP 末段 10s */
     __xdata unsigned int ip_ticks = 0;
     __xdata unsigned char hb_tick = 0, boot_t = 8, ap_sent = 0;
@@ -283,21 +299,25 @@ void main(void) {
                         } else { /* KEY_UP = 贪睡 */
                             unsigned char idx = ring_alarm ? ring_alarm : snooze_idx;
                             ring_alarm = 0; ring_ticks = 0; BEEP_OFF();
-                            snooze_idx = idx; snooze_ticks = (unsigned int)cfg.snooze * 240u;
+                            snooze_idx = idx; snooze_ticks = ((unsigned int)cfg.snooze << 8) - ((unsigned int)cfg.snooze << 4); /* *240 免__mulint */
                         }
                     }
                     continue;
                 }
-                if (cd_mode) {
-                    if (ke.btn == KEY_UP && cd_mode == 1) {
-                        if (ke.ev == EV_SINGLE)    { if (cd_min >= 99) cd_min = 0; cd_min++; }   /* 单击 +1 */
-                        else {                                                               /* 长按 +10(__data 免整型库) */
-                            unsigned char m = cd_min; m += 10; if (m >= 100) m = 99; cd_min = m;
-                        }
-                    } else if (ke.btn == KEY_SET && ke.ev == EV_SINGLE) {
-                        if (cd_mode == 1) { cd_mode = 2; cd_ticks = (unsigned int)cd_min * 240u; cfg.cd_preset = cd_min; }
-                        else { cd_mode = 0; cd_ring = 0; BEEP_OFF(); }
-                    }
+                /* 8266 倒计时接管大屏: 设备键路由到倒计时控制(P2) */
+                if (cd_disp) {
+                    if (ke.btn == KEY_SET && ke.ev == EV_SINGLE) uart_send1(CMD_CD_CTRL, 0);   /* 单击=暂停/恢复 */
+                    else if (ke.btn == KEY_SET && ke.ev == EV_LONG) uart_send1(CMD_CD_CTRL, 1); /* 长按=取消 */
+                    continue;
+                }
+                /* 计时器 长按UP 进/出(非设置态) */
+                if (!tset_mode && !bright_adj && ke.btn == KEY_UP && ke.ev == EV_LONG) {
+                    tm = (tm) ? 0 : 1; tm_sec = 0; tm_min = 0; tm_last = 0;
+                    continue;
+                }
+                if (tm) {
+                    if (ke.btn == KEY_UP && ke.ev == EV_SINGLE) { tm = (tm == 1) ? 2 : 1; if (tm == 2) tm_last = t.sec; }  /* 单击=起/停; 起动捕获当前秒→首秒不快 */
+                    else if (ke.btn == KEY_SET && ke.ev == EV_SINGLE) { tm = 1; tm_sec = 0; tm_min = 0; tm_last = 0; } /* 单击SET=复位 */
                     continue;
                 }
                 if (bright_adj) {
@@ -307,6 +327,8 @@ void main(void) {
                         if (adj_val) cfg.bright_lvl = adj_val;
                     } else if (ke.btn == KEY_UP && ke.ev == EV_SINGLE) {
                         adj_val = (adj_val >= 8) ? 0 : adj_val + 1;   /* 亮度0-8循环, 免%9 */
+                        cfg.bright_mode = (adj_val == 0) ? 0 : 1;     /* 实时改cfg, 主循环apply_bright即时生效 */
+                        if (adj_val) cfg.bright_lvl = adj_val;
                     }
                 } else if (tset_mode) {
                     if (ke.btn == KEY_SET && ke.ev == EV_SINGLE) {
@@ -325,20 +347,19 @@ void main(void) {
                             case 5: inc_date(&t_set); break;
                         }
                     }
-                } else {  /* 常态 */
+                } else {  /* 常态: SET 控亮度/时间设置/IP; UP 手动切整屏模式; 走时SMG1轮换仅 8266 */
                     if (ke.btn == KEY_SET && ke.ev == EV_SINGLE) {
                         bright_adj = 1; adj_val = (cfg.bright_mode == 0) ? 0 : cfg.bright_lvl;
                     } else if (ke.btn == KEY_SET && ke.ev == EV_LONG) {
                         tset_mode = 1; tset_idx = 0;
                         ds1302_read_time(&t_set);
-                    } else if (ke.btn == KEY_UP && ke.ev == EV_DOUBLE) {
-                        cd_mode = 1; cd_min = cfg.cd_preset;
                     } else if (ke.btn == KEY_SET && ke.ev == EV_DOUBLE) {
-                        ip_disp = 1; ip_ticks = 40;             /* 双击SET=显示IP末段+对时 */
+                        ip_disp = 1; ip_ticks = 13;             /* 双击SET=显示P+IP末段3s + 对时 */
                         uart_send_null(CMD_REQ_TIME);
+                    } else if (ke.btn == KEY_UP && ke.ev == EV_DOUBLE) {
+                        mode = DISP_TIME;          /* 双击UP=恢复走时(自动) */
                     } else if (ke.btn == KEY_UP && ke.ev == EV_SINGLE) {
-                        mode_manual = 1;
-                        mode = (mode < DISP_TEMP) ? (mode + 1) : DISP_TIME;  /* 手动切模式 */
+                        mode = (mode < DISP_TEMP) ? (mode + 1) : DISP_TIME;  /* 手动切整屏模式 */
                     }
                 }
             }
@@ -354,11 +375,11 @@ void main(void) {
         uart_poll();
         if (++hb_tick >= 4) { hb_tick = 0; uart_send_null(CMD_HEARTBEAT); }
         if (boot_t) {
-            if (--boot_t == 0 && !esp_online) { beep_once(); beep_once(); beep_once(); } /* 无8266:响3声 */
+            if (--boot_t == 0 && !esp_online) { beep_once(); beep_once(); beep_once(); } /* 无8266:响3声(beep_once 自带间隔) */
         }
 
         light = adc_read(0);
-        if (!bright_adj) apply_bright(light);
+            apply_bright(light);   /* 含亮度调节态: cfg 实时改即即时预览 */
         temp_x10 = ntc_temp_x10(adc_read(1));
 
         ds1302_read_time(&t);
@@ -389,18 +410,16 @@ void main(void) {
             if (snooze_ticks == 0) { ring_alarm = snooze_idx; ring_ticks = 240; }
         }
 
-        /* 倒计时：运行递减，归零响铃；计时器：运行递增 */
-        if (cd_mode == 2 && cd_ticks) {
-            cd_ticks--;
-            if (cd_ticks == 0) cd_ring = 60;   /* 归零响 ~15s */
-        }
-        if (cd_ring) {
-            cd_ring--;
-            if ((cd_ring & 3) < 2) BEEP_ON(); else BEEP_OFF();
-            if (cd_ring == 0) { cd_mode = 0; BEEP_OFF(); }
+        /* 计时器：以 DS1302 秒为基准, 每秒 +1(封顶 99:59 自动停) */
+        if (tm == 2) {
+            if (t.sec != tm_last) {
+                tm_last = t.sec;
+                if (++tm_sec >= 60) { tm_sec = 0; tm_min++; }
+                if (tm_min >= 100) { tm_min = 99; tm_sec = 59; tm = 1; }
+            }
         }
 
-        /* IP 显示 10s 倒计时 */
+        /* IP 显示 3s 倒计时 */
         if (ip_disp) { if (ip_ticks) ip_ticks--; else ip_disp = 0; }
 
         /* 关屏时段：off_start/off_end = [时,分]，0xFF=禁用；支持跨夜（纯字节比较省 overlay） */
@@ -426,16 +445,14 @@ void main(void) {
             render_bright_adj(disp, adj_val, blink);
         } else if (tset_mode) {
             render_setting(disp, &t_set, tset_idx, blink);
-        } else if (cd_mode == 1) {
-            put_mmss(disp, 0, cd_min);                 /* 设定分钟 */
-            if (blink) { disp[0] = disp[1] = disp[2] = disp[3] = 0; }
-        } else if (cd_mode == 2) {
-            unsigned int sec = cd_ticks / 4u;
-            unsigned char mm = 0; while (sec >= 60) { sec -= 60; mm++; }
-            unsigned char ss = (unsigned char)sec;
-            put_mmss(disp, mm, ss);
+        } else if (cd_disp) {
+            put_mmss(disp, cd_mm, cd_ss);             /* 8266 倒计时 */
+        } else if (tm) {
+            put_mmss(disp, tm_min, tm_sec);           /* 计时器 */
         } else if (ip_disp) {
-            unsigned char v = sta_ip_last, h = 0, t = 0, o = v;  /* P + 末段(0-255) */
+            /* P + 状态: 无8266=P000, 8266未联网=P404, 否则=P+IP末段 */
+            unsigned char v = (!esp_online) ? 0 : (net_status ? sta_ip_last : 404);
+            unsigned char h = 0, t = 0, o = v;
             while (o >= 100) { o -= 100; h++; }
             while (o >= 10)  { o -= 10;  t++; }
             disp[0] = SEG_P;
@@ -444,13 +461,19 @@ void main(void) {
             disp[3] = seg_font[o];
             disp[4] = disp[5] = disp[6] = disp[7] = 0;
         } else {
-            if (clock_ok) disp_render(mode, &t, temp_x10, cfg.temp_unit, disp);
+            if (clock_ok) disp_render(mode, &t, temp_x10, smg1_rot, disp);
             else { unsigned char i; for (i = 0; i < 8; i++) disp[i] = blink ? 0x7F : 0x00; } /* 未校时:全段闪 */
         }
         tm1639_write_display(disp);
 
-        if (!bright_adj && !tset_mode && !cd_mode && !mode_manual) {
-            if (++cyc >= 12) { cyc = 0; if (++mode > DISP_TEMP) mode = DISP_TIME; }
+        /* 走时: 大屏恒 HH:MM; SMG1 按 cycle_flags 子轮换 温度/星期(仅 8266 开关; 手动模式不轮换) */
+        if (mode == DISP_TIME && !bright_adj && !tset_mode
+            && !tm && !cd_disp && !ip_disp) {
+            unsigned char f = cfg.cycle_flags;
+            if ((f & 3) == 3) { if (++cyc >= 12) { cyc = 0; smg1_rot ^= 1; } }
+            else if (f & 1) smg1_rot = 0;          /* 仅温度轮显 */
+            else if (f & 2) smg1_rot = 1;          /* 仅日期轮显 */
+            else smg1_rot = 0;                     /* 均未勾选: 默认显温度 */
         }
     }
 }
