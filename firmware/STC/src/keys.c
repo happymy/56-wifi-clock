@@ -1,14 +1,14 @@
 #include "keys.h"
 
-#define SCAN_MS       20
-#define LONG_CNT      50      /* 1000ms / 20ms = 50 拍 */
-#define DBL_CNT       15      /* 300ms / 20ms = 15 拍 */
+#define SCAN_MS       10      /* 名义节拍；实际由 main.c 主循环 delay_ms(10) 驱动 */
+#define LONG_CNT      100     /* 1000ms / 10ms = 100 拍 */
+#define DBL_CNT       15      /* 150ms / 10ms = 15 拍 */
 #define QSIZE         6
 
-/* 按键采样：实板 UP=P3.3, SET=P3.2（与 plan/原理图.md 相反，按实物修正），active-low */
+/* 按键采样：UP=P3.2, SET=P3.3（per 原理图.md §1 / 新版时钟功能.md），active-low */
 static unsigned char pressed(unsigned char btn) {
-    if (btn == KEY_SET) return (unsigned char)(!(P3 & 0x04));   /* SET = P3.2 */
-    return (unsigned char)(!(P3 & 0x08));                        /* UP  = P3.3 */
+    if (btn == KEY_SET) return (unsigned char)(!(P3 & 0x08));   /* SET = P3.3 */
+    return (unsigned char)(!(P3 & 0x04));                        /* UP  = P3.2 */
 }
 
 static __xdata unsigned char q[QSIZE][2];
@@ -45,9 +45,9 @@ void keys_init(void) {
     both_hold = 0;
 }
 
-/* 处理单个键：cur=当前采样, s=该键状态。
-   单击: 松开后等 DBL_CNT 拍无第二击→EV_SINGLE；双击: 第一击 pending 内再按下→松开发 EV_DOUBLE；
-   长按: 按住达 LONG_CNT 拍→EV_LONG(松开不再发单击/双击)。 */
+/* 处理单个键：cur=当前采样, s=该键状态(节拍 ~10ms，见 main.c)。
+    单击: 松开后等 DBL_CNT(15) 拍无第二击→EV_SINGLE；双击: 第一击 pending 内再按下→松开发 EV_DOUBLE；
+    长按: 按住达 LONG_CNT(100) 拍→EV_LONG(松开不再发单击/双击)。 */
 static void scan_one(unsigned char cur, __xdata kst_t *s, unsigned char btn) {
     if (cur) {
         if (!s->down) {                       /* 按下边沿 */

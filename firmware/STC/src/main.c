@@ -276,7 +276,7 @@ void main(void) {
 
     while (1) {
         unsigned char k;
-        for (k = 0; k < 12; k++) {
+        for (k = 0; k < 24; k++) {
             keys_scan();
             while (key_get(&ke)) {
                 /* 响铃/贪睡中：任意键处理停止与贪睡 */
@@ -343,7 +343,7 @@ void main(void) {
                     }
                 }
             }
-            delay_ms(20);
+            delay_ms(10);
         }
 
         /* 双键同按 ≥2s：清 STA 凭据 + 重进 AP 配网（一次性） */
