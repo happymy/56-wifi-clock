@@ -5,10 +5,10 @@
 #define DBL_CNT       15      /* 300ms / 20ms = 15 拍 */
 #define QSIZE         6
 
-/* 按键采样：P3.2=UP, P3.3=SET，active-low（内部上拉=按下读0） */
+/* 按键采样：实板 UP=P3.3, SET=P3.2（与 plan/原理图.md 相反，按实物修正），active-low */
 static unsigned char pressed(unsigned char btn) {
-    if (btn == KEY_SET) return (unsigned char)(!(P3 & 0x08));
-    return (unsigned char)(!(P3 & 0x04));
+    if (btn == KEY_SET) return (unsigned char)(!(P3 & 0x04));   /* SET = P3.2 */
+    return (unsigned char)(!(P3 & 0x08));                        /* UP  = P3.3 */
 }
 
 static __xdata unsigned char q[QSIZE][2];

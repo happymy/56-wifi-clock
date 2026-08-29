@@ -120,14 +120,15 @@ static void put_mmss(__xdata unsigned char *disp, unsigned char mm, unsigned cha
     disp[4] = disp[5] = disp[6] = disp[7] = 0;
 }
 
-/* NTC 原始值 → 温度×10（有符号）。ponytail: 标称 10K@25°C/B=3950 + 10K 上拉，
-   线性近似仅占位；真实曲线未烧录验证，单点标定靠 cfg.temp_offset（Web 下发）。 */
+/* NTC 原始值 → 温度×10（有符号）。ponytail: 标称 10K@25°C/B=4050(MF11-103) + 10K 上拉（原理图确认），
+    线性近似仅占位；真实曲线未烧录验证，单点标定靠 cfg.temp_offset（Web 下发，用户给参考温度）。
+    25°C 时 NTC≈10K=上拉 → raw≈512 为模型零点；偏离室温越远线性误差越大(0/50°C 约±3°C)。 */
 static int ntc_temp_x10(unsigned int raw) {
     if (raw == 0 || raw >= 1023) return -999;       /* 开路/短接 */
-    int d = (int)raw - 511;
+    int d = (int)raw - 512;                         /* 25°C≈raw512(10K NTC+10K 上拉) */
     int p = (d << 5) - ((d << 1) + d);              /* d*29, 免 __mulint */
     int off = (int)cfg.temp_offset;
-    return (2500 - (p >> 5)) + ((off << 3) + (off << 1));  /* +temp_offset*10 */
+    return (250 - (p >> 5)) + ((off << 3) + (off << 1));  /* temp×10: 250=25.0°C */
 }
 
 /* ============ M10: 51 ↔ ESP8266 串口协议（9600 8N1, Timer2 波特源） ============ */
