@@ -47,8 +47,13 @@ static void inc_bcd(__xdata unsigned char *f, unsigned char max_dec) {
 }
 static void inc_date(__xdata ds_time *t) {
     unsigned char m = bcd2bin(t->month);
-    unsigned char max = (m == 2) ? 28  /* Feb 恒28(闰年2/29由8266对时校正, 省 CODE) */
-                                 : ((m <= 7) ? ((m & 1) ? 31 : 30) : ((m & 1) ? 30 : 31));  /* 大小月, 无静态表 */
+    unsigned char max;
+    if (m == 2) {                                  /* 闰年2月29(2000-2099: 年%4) */
+        unsigned char s = (unsigned char)((t->year >> 4) + (t->year >> 4) + (t->year & 0x0F));
+        max = ((s & 3) == 0) ? 29 : 28;
+    } else {
+        max = (m <= 7) ? ((m & 1) ? 31 : 30) : ((m & 1) ? 30 : 31);
+    }
     unsigned char d = bcd2bin(t->date);
     if (++d > max) d = 1;
     { unsigned char b[2]; u2bcd(b, d); t->date = (b[0] << 4) | b[1]; }
@@ -333,7 +338,7 @@ void main(void) {
                             case 0: inc_bcd(&t_set.hr, 23); break;
                             case 1: inc_bcd(&t_set.min, 59); break;
                             case 2: inc_bcd(&t_set.sec, 59); break;
-                            case 3: inc_bcd(&t_set.year, 99); break;
+                            case 3: inc_bcd(&t_set.year, 99); if (t_set.year < 0x26) t_set.year = 0x26; break;  /* 年 2026-2099 */
                             case 4: inc_bcd(&t_set.month, 12); break;
                             case 5: inc_date(&t_set); break;
                         }
