@@ -22,6 +22,8 @@
     python uart_8266_sim.py settime  COM3 12:34:56 --tz 8
     python uart_8266_sim.py setcfg   COM3 cfg.bin
     python uart_8266_sim.py setcfg   COM3 --smg1 1 --temp-unit 1
+    python uart_8266_sim.py setcfg   COM3 --rotate 1        # 开启大屏自动轮显(每分钟整分轮换, 落盘)
+    python uart_8266_sim.py setcfg   COM3 --led 0            # 关闭红色状态灯(落盘); --led 1 恢复
     python uart_8266_sim.py staip    COM3 192.168.1.10
     python uart_8266_sim.py cd       COM3 on 01 30      # DISP_OVERRIDE 倒计时接管 MM:SS
     python uart_8266_sim.py cd       COM3 off           # DISP_OVERRIDE 释放
@@ -140,7 +142,8 @@ def fmt_frame(cmd, payload):
 class Sim:
     def __init__(self, port, baud=BAUD):
         self.ser = open_port(port, baud)
-        self.our_cfg = bytes(54)        # 我们下发给 51 的 SET_CFG（用于回读）
+        self.our_cfg = bytearray(54)     # 我们下发给 51 的 SET_CFG（用于回读）
+        self.our_cfg[20] = 1             # led_en 默认开(偏移20)
         self.echo_cfg = None            # 51 回的 SET_CFG（REQ_CFG 应答）
         self.stop = threading.Event()
         self.parser = Parser(self._on_frame)
@@ -199,6 +202,10 @@ def cmd_monitor(args):
 
 def cmd_server(args):
     sim = Sim(args.port, args.baud)
+    if args.rotate is not None:
+        sim.our_cfg = bytes([args.rotate & 1]) + bytes(53)  # 随 REQ_CFG 下推 display_mode
+    if args.led is not None:
+        sim.our_cfg[20] = args.led & 1                      # 随 REQ_CFG 下推 led_en
     if args.boot:
         time.sleep(0.05)
         sim.send(CMD_BOOT)
@@ -255,6 +262,12 @@ def cmd_setcfg(args):
         data[21] = args.smg1 & 0xFF        # smg1_mode @ 偏移21（0=温度 1=日期）
     if args.temp_unit is not None:
         data[53] = args.temp_unit & 0xFF    # temp_unit @ 偏移53（0=°C 1=°F）
+    if args.rotate is not None:
+        data[0] = args.rotate & 0xFF        # display_mode @ 偏移0（0=不自动轮显 1=自动轮显）
+    if args.led is not None:
+        data[20] = args.led & 0xFF          # led_en @ 偏移20（1=开 0=关红灯）
+    elif not args.file:
+        data[20] = 1                         # 默认开(联网亮灯)
     sim.our_cfg = bytes(data)
     sim.send(CMD_SET_CFG, bytes(data))
     time.sleep(0.3)
@@ -304,6 +317,10 @@ def main():
     p.add_argument("port")
     p.add_argument("--no-boot", dest="boot", action="store_false",
                    help="不在连接时自动发 BOOT")
+    p.add_argument("--rotate", type=int, choices=[0, 1],
+                   help="display_mode @ 偏移0：1=自动轮显(随 REQ_CFG 下推)")
+    p.add_argument("--led", type=int, choices=[0, 1],
+                   help="led_en @ 偏移20：1=开红灯(默认) 0=关红灯")
     p.set_defaults(func=cmd_server, boot=True)
 
     p = sub.add_parser("boot", help="发送 BOOT(0x8F) 握手帧")
@@ -324,6 +341,10 @@ def main():
                    help="smg1_mode @ 偏移21：0=温度 1=日期")
     p.add_argument("--temp-unit", dest="temp_unit", type=int, choices=[0, 1],
                    help="temp_unit @ 偏移53：0=°C 1=°F")
+    p.add_argument("--rotate", type=int, choices=[0, 1],
+                   help="display_mode @ 偏移0：0=不自动轮显 1=自动轮显(每分钟整分轮换)")
+    p.add_argument("--led", type=int, choices=[0, 1],
+                   help="led_en @ 偏移20：1=开红灯(默认) 0=关红灯(联网也不亮)")
     p.set_defaults(func=cmd_setcfg)
 
     p = sub.add_parser("staip", help="发送 STA_IP(0x88) 供双击 SET 显示 P+IP末段")
