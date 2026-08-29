@@ -75,7 +75,13 @@ static void scan_one(unsigned char cur, __xdata kst_t *s, unsigned char btn) {
 void keys_scan(void) {
     unsigned char p0 = pressed(KEY_SET);
     unsigned char p1 = pressed(KEY_UP);
-    if (p0 && p1) { both_hold = 1; return; }
+    if (p0 && p1) {
+        both_hold = 1;
+        /* 双键同按期间吞掉单键状态机：清 down，松手不再误判新单击→进亮度(根因：同按时
+           跳过 scan_one，down 残留而 t_down 不涨)。其余字段下次按下自清。*/
+        st[0].down = st[1].down = 0;
+        return;
+    }
     both_hold = 0;
     scan_one(p0, &st[0], KEY_SET);
     scan_one(p1, &st[1], KEY_UP);
