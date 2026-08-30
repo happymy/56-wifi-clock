@@ -115,7 +115,7 @@ STC 芯片靠串口下载，流程是“先点下载、再上电”：
 - ✅ **传感器热敏温度 + 单点补偿**（temp_offset 由 8266 下推）、EEPROM 持久化（IAP）、三组闹钟、状态指示灯重构、计时器（51 原生 MM:SS 封顶 99:59）——均已完成。
 - ✅ **51 固件研发结束（v1.0.7）**：功能与硬件实机测试全部完成——串口协议帧（SET_CFG/对时/自动轮显/闹钟贪睡/计时器/°F 换算/日期/温度）逐项实机验证通过；`temp_offset` 单位（整数°C）实测标定；`SET_CFG` 读回防清零修复。51 端开发**收尾结束**，后续仅有随 8266 联调的排障性微调，不再有新功能开发。CODE 8182/8192B（余 10B）。
 - ⚠️ **已裁撤 / 未移植功能（代码完成度见 `plan/新版时钟功能.md` §十九）**：整点报时（曾 100% 实现后移除）、事项提醒 rem1–5（0% 从未实现）、计时器「时」位（0%）、IP 4 段滚动（曾实现后简化为 P+末段）、极暗软件 PWM（仅 demo 验证，产品未移植）。
-- ✅ **ESP8266 固件（firmware/8266，已实现）**：NTP 校时、两页 Web 配置（AP 配网 + STA 全功能）、STA_IP 推送、倒计时 tick 权威（DISP_OVERRIDE 显示接管）、伪待机（CPU 常驻 + RF 关 + 闲置 2min 断网）。`pio run` 零错零告警，真机 `link_hw_test.py` S1–S10 全绿。协议设计命令 ACK/NAK/BTN_EVENT/AP_READY 等**按要求未实现/未消费**（见 `plan/串口通信协议.md` 与 §8266 下述）。参考脚本见 `firmware/STC/test/uart_8266_sim.py`、`plan/8266串口测试计划.md`。
+- ✅ **ESP8266 固件（firmware/8266，已实现）**：NTP 校时、两页 Web 配置（AP 配网 + STA 全功能）、STA_IP 推送、倒计时 tick 权威（DISP_OVERRIDE 显示接管）、伪待机（CPU 常驻 + RF 关 + 闲置 5min 断网）。`pio run` 零错零告警，真机 `link_hw_test.py` S1–S10 全绿。协议设计命令 ACK/NAK/BTN_EVENT/AP_READY 等**按要求未实现/未消费**（见 `plan/串口通信协议.md` 与 §8266 下述）。参考脚本见 `firmware/STC/test/uart_8266_sim.py`、`plan/8266串口测试计划.md`。
 
 ## 版本里程碑
 | Tag | 说明 |

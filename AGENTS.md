@@ -52,7 +52,7 @@
 - **可用容量红线**：ESP-01S 为 **1MB（8Mbit）外部 flash**。本项目 **不用 OTA/不用文件系统**，`platformio.ini` 锁 `board_build.ldscript = eagle.flash.1m.ld`（1M no SPIFFS/OTA）→ **irom 程序区约 999KB（ld `len=0xf9ff0`=1023984B，即构建输出的 `1023984` 上限）**、EEPROM 模拟保留区 **4KB（1 sector）**（store 仅 `begin(512)`）。注意：**勿引 `1m256.ld` 的 762KB/761840B**（那是带 256KB SPIFFS 布局的数，本项目不用）。**Web 页面等静态内容全部内嵌 PROGMEM（`F("...")`）字符串**，绝不依赖 LittleFS/SPIFFS 外部文件。
 - **RAM 红线**：ESP8266 用户可用堆约 **80KB**（IRAM 受限）。Web 响应一律 `F()` 存储、避免大 `String` 堆碎片；**禁止引入任何 JS/CSS 大框架**（jQuery/Bootstrap 等）。
 - **Web UI 用户友好、简单实用**：UI 是给不熟悉配置的普通人用的——中文文案、单页原生表单（`<form method=post>`）、默认值回填、提交后回显结果。**两页严格分离**：① AP 配网页（`192.168.4.1`）只填 WiFi 账号，其余一项不设，配网成功即关 AP；② STA 配置页（同网段 IP）全功能单页。
-- **状态机与调度**（按 `plan/串口通信协议.md §6` 伪待机）：CPU 常驻 + RF 关（`WiFi.forceSleepBegin()`）；仅对时/开 AP 时 `forceSleepWake()`；STA 关联后闲置 2 分钟自动断回伪待机；每日 00:00/12:00 自定时对时。**永不 deep-sleep**（硬件无唤醒线）。
+- **状态机与调度**（按 `plan/串口通信协议.md §6` 伪待机）：CPU 常驻 + RF 关（`WiFi.forceSleepBegin()`）；仅对时/开 AP 时 `forceSleepWake()`；STA 关联后闲置 5 分钟（Web 访问刷新计时）自动断回伪待机；每日 00:00/12:00 自定时对时。**永不 deep-sleep**（硬件无唤醒线）。
 - **倒计时权威在 8266**：维护倒计时 tick，每 1s 推 `DISP_OVERRIDE(0x89) mode1[mm,ss]`（mm/ss 传**十进制值字节**，禁按十六进制）；归零推 mode2 响铃；收到 51 `CD_CTRL(0x05)`=0 暂停/恢复、1 取消（取消后须回发 mode0 真释放显示）。
 - **SET_CFG 完整性铁律（51 侧整帧覆盖，不做字节级合并）**：8266 必须维护**完整 54B 镜像**：上线先发 `REQ_CFG(0x87)` 拉当前值作底；改某字段只改镜像对应字节，再整帧 `SET_CFG(0x82,54B)` 下发。**严禁只发想改的字节其余填 0**，否则清空 51 亮度等按键值。闹钟时/分在 54B 中为 **BCD**（`0x15`=15点），下发前必须换算。
 - **对时与 NTP**：`configTime(tz, 0, ntp[], ...)` → `time(nullptr)` 得本地时间，换算 BCD 组 `SET_TIME(0x81) 8B` 下发 51；NTP 服务器按协议列表失败递进（国内 3 + 国外 2）。DST 需在换算时叠加。
