@@ -13,12 +13,12 @@ typedef struct {
     unsigned char tz;                 /* 时区(有符号, UTC+8=+8) */
     unsigned char off_start[2];      /* 关屏起 时+分(0xFF=禁用) */
     unsigned char off_end[2];        /* 关屏止 时+分 */
-    unsigned char chime;             /* 整点报时 0=关 1=开 2=半点也报 */
+    unsigned char chime;             /* 保留(整点报时已裁撤: 8KB Flash 容量不足); SET_CFG 字节18 仍占位 */
     unsigned char snooze;            /* 贪睡 0=关 5/10=分钟 */
     unsigned char led_en;            /* 红灯指示使能: 1=开(默认) 0=关(8266 经 SET_CFG 偏移20 控制) */
     unsigned char smg1_mode;         /* SMG1 选显: 0=温度 1=日期(8266 配置, 不轮换) */
-    unsigned char chime_off_start[2];/* 整点静音窗起 时+分(0xFF=禁用), 与关屏窗独立 */
-    unsigned char chime_off_end[2];  /* 整点静音窗止 */
+    unsigned char chime_off_start[2];/* 保留(整点静音窗随报时裁撤); SET_CFG 字节22-23 仍占位 */
+    unsigned char chime_off_end[2];  /* 保留; SET_CFG 字节24-25 仍占位 */
     unsigned char rem[26];           /* 事项提醒预留(§6 未启用), 占原 rem1-5 区, 不位移 cd_preset/temp_unit */
     unsigned char cd_preset;         /* 倒计时预设(分 1–60, 默认5) */
     unsigned char temp_unit;         /* 0=°C 1=°F */

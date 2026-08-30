@@ -28,8 +28,8 @@ void cfg_defaults(void) {
     cfg.tz = 8;                /* UTC+8 */
     cfg.off_start[0] = 0xFF; cfg.off_start[1] = 0xFF;   /* 关屏禁用 */
     cfg.off_end[0]   = 0xFF; cfg.off_end[1]   = 0xFF;
-    cfg.chime = 0;
-    cfg.chime_off_start[0] = 0xFF; cfg.chime_off_start[1] = 0xFF; /* 整点静音禁用 */
+    cfg.chime = 0;            /* 保留: 整点报时已裁撤(容量不足), 字节18 仍占位 */
+    cfg.chime_off_start[0] = 0xFF; cfg.chime_off_start[1] = 0xFF; /* 保留: 静音窗随报时裁撤 */
     cfg.chime_off_end[0]   = 0xFF; cfg.chime_off_end[1]   = 0xFF;
     cfg.snooze = 5;
     cfg.led_en = 1;           /* 默认开, 保留联网亮灯行为 */

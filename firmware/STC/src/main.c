@@ -215,14 +215,6 @@ static void uart_dispatch(unsigned char cmd, __xdata unsigned char *p, unsigned 
 }
 static unsigned char p_st = 0, p_cmd = 0, p_len = 0, p_idx = 0, p_chk = 0;
 static __xdata unsigned char p_buf[64];
-/* 时段命中: sh/sm=起时/分, eh/em=止时/分, th/tm=当前时/分; 起或止禁用(0xFF)返回0; 支持跨夜(纯字节比较) */
-static unsigned char in_win(unsigned char sh, unsigned char sm, unsigned char eh, unsigned char em,
-                            unsigned char th, unsigned char tm) {
-    if (sh == 0xFF || eh == 0xFF) return 0;
-    if (sh <= eh)
-        return ((th > sh) || (th == sh && tm >= sm)) && ((th < eh) || (th == eh && tm < em));
-    return !(((th < sh) || (th == sh && tm < sm)) && ((th < eh) || (th == eh && tm < em)));
-}
 
 static void uart_poll(void) {
     while (urx_r != urx_w) {
@@ -252,10 +244,12 @@ void main(void) {
     __xdata unsigned char last_min = 0xFF;
     __xdata unsigned char ring_alarm = 0;       /* 0=静音, 1..3 正在响 */
     __xdata unsigned int  ring_ticks = 0;        /* 当前响铃剩余 250ms 拍 */
+    __xdata unsigned char wake_ticks = 0;       /* 关屏时段内点按唤醒剩余秒(0=不唤醒) */
     __xdata unsigned int  snooze_ticks = 0;     /* 贪睡倒计时(拍) */
     __xdata unsigned char snooze_idx = 0;       /* 贪睡对应的闹钟索引(1..3, 0=无) */
     __xdata unsigned char tm = 0;               /* 计时器状态: 0关 1暂停 2运行 */
         __xdata unsigned char tm_sec = 0, tm_min = 0, tm_last = 0; /* 计时 MM:SS + DS1302秒基准 */
+    __xdata unsigned char sec_last = 0xFF;     /* 每秒基准: 用于唤醒倒计时 */
 
     __xdata unsigned char ip_disp = 0;           /* 显示配网 IP 末段 ~3s */
     __xdata unsigned int ip_ticks = 0;
@@ -296,6 +290,7 @@ void main(void) {
             keys_scan();
             uart_poll();   /* 高频轮询: 10ms级, 两轮间<12字节, 32B环不溢出, SET_CFG(59B)分段收全 */
             while (key_get(&ke)) {
+                wake_ticks = 10;   /* 关屏时段内任意键唤醒10s(非关屏期无副作用) */
                 /* 仅"正在响铃"拦截按键: SET=停响+关所有贪睡倒计时(滴两声确认), UP=贪睡; 贪睡倒计时期间不拦截, 按键走正常功能 */
                 if (ring_alarm) {
                     if (ke.btn == KEY_SET) {
@@ -386,17 +381,20 @@ void main(void) {
         temp_x10 = ntc_temp_x10(adc_read(1));
 
         ds1302_read_time(&t);
+        if (t.sec != sec_last) { sec_last = t.sec; if (wake_ticks) wake_ticks--; }  /* 每秒递减唤醒计时 */
 
-        /* 关屏窗：off_start/off_end 命中→整屏灭（§七, 须放显示填充后） */
-        unsigned char off_on = in_win(cfg.off_start[0], cfg.off_start[1], cfg.off_end[0], cfg.off_end[1], t.hr, t.min);
-        /* 整点静音窗：与关屏窗独立, 命中仅静音整点报时 */
-        unsigned char chime_off_on = in_win(cfg.chime_off_start[0], cfg.chime_off_start[1], cfg.chime_off_end[0], cfg.chime_off_end[1], t.hr, t.min);
+        /* 关屏窗：off_start/off_end 命中→整屏灭（§七, 须放显示填充后）；跨夜纯字节比较 */
+        unsigned char sh = cfg.off_start[0], sm = cfg.off_start[1], eh = cfg.off_end[0], em = cfg.off_end[1];
+        unsigned char off_on = (sh != 0xFF && eh != 0xFF) &&
+            ((sh <= eh)
+                ? ((t.hr > sh || (t.hr == sh && t.min >= sm)) && (t.hr < eh || (t.hr == eh && t.min < em)))
+                : ((t.hr > sh || (t.hr == sh && t.min >= sm)) || (t.hr < eh || (t.hr == eh && t.min < em))));
+
 
         /* 分钟变化：整点报时 + 闹钟匹配(到点即接管蜂鸣, 保证0秒触发) */
         if (t.min != last_min) {
             last_min = t.min;
             if (cfg.display_mode == 1) mode = (mode < DISP_TEMP) ? (mode + 1) : DISP_TIME;  /* 8266 控制: 每分钟轮换整屏主模式 */
-            if (t.min == 0 && cfg.chime >= 1 && !chime_off_on) beep_once();
             {
                 unsigned char a;
                 for (a = 0; a < 3; a++) {
@@ -457,8 +455,8 @@ void main(void) {
             if (clock_ok) disp_render(mode, &t, temp_x10, smg1_rot, disp);
             else { unsigned char i; for (i = 0; i < 8; i++) disp[i] = blink ? 0x7F : 0x00; } /* 未校时:全段闪 */
         }
-        /* 关屏窗：off_on 命中则整屏灭(必须放显示填充之后, 见§七)；响铃时强制亮屏；整点静音由 chime_off_on 独立控制 */
-        if (off_on && !ring_alarm) { unsigned char i; for (i = 0; i < 8; i++) disp[i] = 0; }
+        /* 关屏窗：off_on 命中则整屏灭(必须放显示填充之后, 见§七); 点按唤醒/响铃时强制亮屏 */
+        if (off_on && !wake_ticks && !ring_alarm) { unsigned char i; for (i = 0; i < 8; i++) disp[i] = 0; }
         tm1639_write_display(disp);
 
         /* 走时: 大屏恒 HH:MM; SMG1 由 cfg.smg1_mode 固定选 温度/日期(8266 配置, 不轮换) */
