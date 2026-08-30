@@ -245,7 +245,7 @@ void main(void) {
     __xdata unsigned char ring_alarm = 0;       /* 0=静音, 1..3 正在响 */
     __xdata unsigned int  ring_ticks = 0;        /* 当前响铃剩余 250ms 拍 */
     __xdata unsigned int  snooze_ticks = 0;     /* 贪睡倒计时(拍) */
-    __xdata unsigned char snooze_idx = 0;       /* 贪睡对应的闹钟索引 */
+    __xdata unsigned char snooze_idx = 0;       /* 贪睡对应的闹钟索引(1..3, 0=无) */
     __xdata unsigned char tm = 0;               /* 计时器状态: 0关 1暂停 2运行 */
         __xdata unsigned char tm_sec = 0, tm_min = 0, tm_last = 0; /* 计时 MM:SS + DS1302秒基准 */
 
@@ -288,16 +288,15 @@ void main(void) {
             keys_scan();
             uart_poll();   /* 高频轮询: 10ms级, 两轮间<12字节, 32B环不溢出, SET_CFG(59B)分段收全 */
             while (key_get(&ke)) {
-                /* 响铃/贪睡中：任意键处理停止与贪睡 */
+                /* 响铃/贪睡中：任意键事件均处理(防长按/双击被忽略致"按键无效")；SET取消/UP贪睡 */
                 if (ring_alarm || snooze_ticks) {
-                    if (ke.ev == EV_SINGLE) {
-                        if (ke.btn == KEY_SET) {
-                            ring_alarm = 0; ring_ticks = 0; snooze_ticks = 0; BEEP_OFF();
-                        } else { /* KEY_UP = 贪睡 */
-                            unsigned char idx = ring_alarm ? ring_alarm : snooze_idx;
-                            ring_alarm = 0; ring_ticks = 0; BEEP_OFF();
-                            snooze_idx = idx; snooze_ticks = ((unsigned int)cfg.snooze << 8) - ((unsigned int)cfg.snooze << 4); /* *240 免__mulint */
-                        }
+                    if (ke.btn == KEY_SET) {
+                        ring_alarm = 0; ring_ticks = 0; snooze_idx = 0; snooze_ticks = 0; BEEP_OFF();
+                        beep_once(); beep_once();          /* ponytail: 取消确认音, 免"按键无效"误判 */
+                    } else { /* KEY_UP = 贪睡 */
+                        unsigned char idx = ring_alarm ? ring_alarm : snooze_idx;
+                        ring_alarm = 0; ring_ticks = 0; BEEP_OFF();
+                        snooze_idx = idx; snooze_ticks = ((unsigned int)cfg.snooze << 8) - ((unsigned int)cfg.snooze << 4); /* *240 免__mulint */
                     }
                     continue;
                 }
@@ -381,13 +380,13 @@ void main(void) {
 
         ds1302_read_time(&t);
 
-        /* 分钟变化：整点报时 + 闹钟匹配（响铃中不重复触发） */
+        /* 分钟变化：整点报时 + 闹钟匹配(到点即接管蜂鸣, 保证0秒触发) */
         if (t.min != last_min) {
             last_min = t.min;
             if (cfg.display_mode == 1) mode = (mode < DISP_TEMP) ? (mode + 1) : DISP_TIME;  /* 8266 控制: 每分钟轮换整屏主模式 */
             if (t.min == 0 && cfg.chime >= 1) beep_once();
             else if (t.min == 30 && cfg.chime == 2) beep_once();
-            if (!ring_alarm && !snooze_ticks) {
+            {
                 unsigned char a;
                 for (a = 0; a < 3; a++) {
                     if (cfg.alarm[a][0] && cfg.alarm[a][1] == t.hr && cfg.alarm[a][2] == t.min) {
@@ -405,7 +404,7 @@ void main(void) {
             }
         } else if (snooze_ticks) {
             snooze_ticks--;
-            if (snooze_ticks == 0) { ring_alarm = snooze_idx; ring_ticks = 240; }
+            if (snooze_ticks == 0) { ring_alarm = snooze_idx; ring_ticks = 240; snooze_idx = 0; }
         }
 
         /* 计时器：以 DS1302 秒为基准, 每秒 +1(封顶 99:59 自动停) */
