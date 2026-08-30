@@ -42,6 +42,8 @@ void proto_on_frame(uint8_t cmd, const uint8_t *p, uint8_t len) {
 
 void setup() {
     Serial.begin(9600);            /* UART1 与 51 唯一链路；伪待机期间保持在线 */
+    proto_send_null(CMD_BOOT);     /* 首帧立即发：51 上电仅 2s 窗口（boot_t=8×250ms），
+                                      等 loop 的 2s 周期再发必落窗口外 → 51 beep3 进调试模式 */
     store_init();
     store_load();                  /* 载入 WiFi 凭据 / 镜像备份（g_cfg_valid 仍 false，以 51 为准） */
     cd_set_preset(store_get_cd_min(), store_get_cd_sec()); /* 载入倒计时预设（默认 5 分） */
