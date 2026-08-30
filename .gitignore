@@ -18,3 +18,6 @@ firmware/STC/build.log
 # Python 缓存（任意位置）
 __pycache__/
 *.pyc
+
+# PlatformIO 构建产物
+.pio/

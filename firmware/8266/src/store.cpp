@@ -14,7 +14,6 @@
 #define OFF_CD       167
 
 static void putc(size_t o, uint8_t v) { EEPROM.write(o, v); }
-static uint8_t getc(size_t o)         { return EEPROM.read(o); }
 
 void store_init() { EEPROM.begin(EEP_SIZE); }
 
@@ -56,7 +55,7 @@ const char *store_get_ap_pwd() {
     size_t i;
     for (i = 0; i < 16 && EEPROM.read(OFF_AP_PWD + i); i++) buf[i] = EEPROM.read(OFF_AP_PWD + i);
     buf[i] = 0;
-    return buf[0] ? buf : "12345678";
+    return (buf[0] == 0xFF || buf[0] == 0) ? "12345678" : buf;   /* 0xFF=擦除态,0=空串 均回默认 */
 }
 
 void store_save_cfg_blob() { for (int i = 0; i < CFG_LEN; i++) putc(OFF_CFG + i, g_cfg[i]); EEPROM.commit(); }
