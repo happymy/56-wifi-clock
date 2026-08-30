@@ -57,4 +57,4 @@
 - **SET_CFG 完整性铁律（51 侧整帧覆盖，不做字节级合并）**：8266 必须维护**完整 54B 镜像**：上线先发 `REQ_CFG(0x87)` 拉当前值作底；改某字段只改镜像对应字节，再整帧 `SET_CFG(0x82,54B)` 下发。**严禁只发想改的字节其余填 0**，否则清空 51 亮度等按键值。闹钟时/分在 54B 中为 **BCD**（`0x15`=15点），下发前必须换算。
 - **对时与 NTP**：`configTime(tz, 0, ntp[], ...)` → `time(nullptr)` 得本地时间，换算 BCD 组 `SET_TIME(0x81) 8B` 下发 51；NTP 服务器按协议列表失败递进（国内 3 + 国外 2）。DST 需在换算时叠加。
 - **文档纪律（同 §4，禁猜 API）**：8266 一切 API（Arduino core `ESP8266WebServer`/`WiFi.forceSleep*`/`configTime`/`EEPROM` 等）**一律先查官方文档**（arduino-esp8266.readthedocs.io；裸 SDK → espressif.com）再写；说不准就查已装 core 头文件/库源码。
-- **构建与验收**：工程为 PlatformIO（`platformio.ini` 锁定 `espressif8266` platform + `framework=arduino` + 1MB 分区）。每次改完 `pio run` 零错误零告警；烧录 `pio run -t upload`（ESP-01S GPIO0 拉低进下载模式）。协议逻辑对照 `firmware/STC/test/` 既有脚本语义。
+- **构建与验收**：工程为 PlatformIO（`platformio.ini` 锁定 `espressif8266` platform + `framework=arduino` + 1MB 分区）。每次改完 `pio run` 零错误零告警；烧录用 `firmware/8266/编程计划.md` §烧录 的 esptool 命令（真机已验证；`pio run -t upload` 未经受自动下载器时序，勿依赖，计时器试购后不走）。协议逻辑对照 `firmware/STC/test/` 既有脚本语义。
