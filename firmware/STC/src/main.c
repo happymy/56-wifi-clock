@@ -181,6 +181,8 @@ unsigned char clock_ok = 1;               /* 1=DS1302 走时有效(CH=0) */
 /* 8266 倒计时显示接管：DISP_OVERRIDE 帧写入, main 渲染/按键读取 */
 static __xdata unsigned char cd_disp = 0;          /* 1=大屏显示 8266 倒计时 */
 static __xdata unsigned char cd_mm = 0, cd_ss = 0; /* 8266 推来的剩余 MM:SS */
+static __xdata unsigned char ring_alarm;            /* 0=静音, 1..3 闹钟响铃, 4=倒计时归零响铃(启动清XISEG) */
+static __xdata unsigned int  ring_ticks;             /* 当前响铃剩余 250ms 拍 */
 
 static void apply_set_time(__xdata unsigned char *p) {
     tscr.year = p[0]; tscr.month = p[1]; tscr.date = p[2]; tscr.weekday = p[3];
@@ -207,7 +209,7 @@ static void uart_dispatch(unsigned char cmd, __xdata unsigned char *p, unsigned 
             if (esp_online && len >= 1) {
                 if (p[0] == 0) cd_disp = 0;
                 else if (p[0] == 1 && len >= 3) { cd_disp = 1; cd_mm = p[1]; cd_ss = p[2]; }
-                else if (p[0] == 2) { beep_once(); beep_once(); beep_once(); }  /* 倒计时归零响铃 */
+                else if (p[0] == 2) { ring_alarm = 4; ring_ticks = 240; }  /* 倒计时归零响铃: 复用闹钟机制(可SET停/UP贪睡), 非阻塞 */
             }
             break;
         default: break;
@@ -242,8 +244,6 @@ void main(void) {
     __xdata unsigned char bright_adj = 0, adj_val = 0;
     __xdata unsigned char tset_mode = 0, tset_idx = 0;
     __xdata unsigned char last_min = 0xFF;
-    __xdata unsigned char ring_alarm = 0;       /* 0=静音, 1..3 正在响 */
-    __xdata unsigned int  ring_ticks = 0;        /* 当前响铃剩余 250ms 拍 */
     __xdata unsigned char wake_ticks = 0;       /* 关屏时段内点按唤醒剩余秒(0=不唤醒) */
     __xdata unsigned int  snooze_ticks = 0;     /* 贪睡倒计时(拍) */
     __xdata unsigned char snooze_idx = 0;       /* 贪睡对应的闹钟索引(1..3, 0=无) */
@@ -323,6 +323,7 @@ void main(void) {
                         bright_adj = 0;
                         cfg.bright_mode = (adj_val == 0) ? 0 : 1;
                         if (adj_val) cfg.bright_lvl = adj_val;
+                        cfg_save();   /* 按键调亮度落盘: 断电/8266重拉配置不丢 */
                     } else if (ke.btn == KEY_UP && ke.ev == EV_SINGLE) {
                         adj_val = (adj_val >= 8) ? 0 : adj_val + 1;   /* 亮度0-8循环, 免%9 */
                         cfg.bright_mode = (adj_val == 0) ? 0 : 1;     /* 实时改cfg, 主循环apply_bright即时生效 */
