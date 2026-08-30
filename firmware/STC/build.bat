@@ -2,8 +2,8 @@
 chcp 936 >nul
 cd /d %~dp0
 setlocal
-REM Build STC15W408AS product firmware (51 side)
-REM 产品本地驱动(optimized copy)在 src/；demo/_common 仍保留供 demo 单独验证
+REM Build STC15W408AS product firmware, 51 side
+REM local drivers in src, optimized copy; demo/_common kept for standalone demo verify
 set SDCC_BIN=C:\Program Files\SDCC\bin
 if exist "%SDCC_BIN%\sdcc.exe" set "PATH=%SDCC_BIN%;%PATH%"
 if not exist out mkdir out
