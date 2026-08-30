@@ -288,15 +288,14 @@ void main(void) {
             keys_scan();
             uart_poll();   /* 高频轮询: 10ms级, 两轮间<12字节, 32B环不溢出, SET_CFG(59B)分段收全 */
             while (key_get(&ke)) {
-                /* 响铃/贪睡中：任意键事件均处理(防长按/双击被忽略致"按键无效")；SET取消/UP贪睡 */
-                if (ring_alarm || snooze_ticks) {
+                /* 仅"正在响铃"拦截按键: SET=停响+关所有贪睡倒计时(滴两声确认), UP=贪睡; 贪睡倒计时期间不拦截, 按键走正常功能 */
+                if (ring_alarm) {
                     if (ke.btn == KEY_SET) {
                         ring_alarm = 0; ring_ticks = 0; snooze_idx = 0; snooze_ticks = 0; BEEP_OFF();
-                        beep_once(); beep_once();          /* ponytail: 取消确认音, 免"按键无效"误判 */
+                        beep_once(); beep_once();          /* ponytail: 取消确认音 */
                     } else { /* KEY_UP = 贪睡 */
-                        unsigned char idx = ring_alarm ? ring_alarm : snooze_idx;
+                        snooze_idx = ring_alarm; snooze_ticks = ((unsigned int)cfg.snooze << 8) - ((unsigned int)cfg.snooze << 4); /* *240 免__mulint */
                         ring_alarm = 0; ring_ticks = 0; BEEP_OFF();
-                        snooze_idx = idx; snooze_ticks = ((unsigned int)cfg.snooze << 8) - ((unsigned int)cfg.snooze << 4); /* *240 免__mulint */
                     }
                     continue;
                 }
