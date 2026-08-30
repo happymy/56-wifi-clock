@@ -83,7 +83,7 @@ STC 芯片靠串口下载，流程是“先点下载、再上电”：
 - ✅ **DS1302 实时时钟 + 断电能走时**（v0.5）：突发读判定 CH 位、上电首读加延时与重试（修复断电清零）、单字节写清 CH 保证连续走时；`ds1302.c/h` 已提交并烧录验证。
 - ✅ **传统手动设置**（v0.5）：SET 单击进入并循环切换字段（时→分→秒→日→月→年→星期），UP 在当前字段加值（独立回绕、闰年感知），末字段 SET 保存+响蜂鸣。
 - ✅ **硬件 UART1 回环验证**（uart-loopback-v0.6 / v0.6）：STC15W408AS 无 Timer1，UART1 改用 Timer2 波特源（9600 8N1），自发自收比对，大屏左发/右收、SMG 显 0/E、串口打印 `TX=.. RX=.. OK/FAIL`。
-- ✅ **51 产品固件（firmware/STC，v1.0.5）**：完整按键语义（SET 单/双/长按、UP 单/双/长按进计时器、双键≥5s 重配网）、配置 54B EEPROM 持久化（IAP 0x0000–0x13FF）、SET_TIME/SET_CFG/NET_STAT/STA_IP/REQ_CFG/REQ_TIME/HEARTBEAT/ENTER_AP/CD_CTRL/DISP_OVERRIDE 协议收发、SMG1 温度/日期选显、闰年感知、大屏整屏自动轮播（`display_mode`）、红色状态灯使能（`led_en`）、倒计时显示接管（DISP_OVERRIDE 驱动）。CODE 余量极小（8178/8192B，余 14B），改动前必读 `firmware/STC/BUILD.md`。**51 端功能已全部完成，进入第一轮全面测试。**
+- ✅ **51 产品固件（firmware/STC，v1.0.5）**：完整按键语义（SET 单/双/长按、UP 单/双/长按进计时器、双键≥5s 重配网）、配置 54B EEPROM 持久化（IAP 0x0000–0x13FF）、SET_TIME/SET_CFG/NET_STAT/STA_IP/REQ_CFG/REQ_TIME/HEARTBEAT/ENTER_AP/CD_CTRL/DISP_OVERRIDE 协议收发、SMG1 温度/日期选显、闰年感知、大屏整屏自动轮播（`display_mode`）、红色状态灯使能（`led_en`）、倒计时显示接管（DISP_OVERRIDE 驱动）。CODE 余量极小（余量以 `firmware/STC/BUILD.md` 为准），改动前必读 `firmware/STC/BUILD.md`。**51 端功能已全部完成，进入第一轮全面测试。**
 - ✅ **传感器热敏温度 + 单点补偿**（temp_offset 由 8266 下推）、EEPROM 持久化（IAP）、三组闹钟、状态指示灯重构、计时器（51 原生 MM:SS 封顶 99:59）——均已完成。
 - ⚠️ **已裁撤 / 未移植功能（代码完成度见 `plan/新版时钟功能.md` §十九）**：整点报时（曾 100% 实现后移除）、事项提醒 rem1–5（0% 从未实现）、计时器「时」位（0%）、IP 4 段滚动（曾实现后简化为 P+末段）、极暗软件 PWM（仅 demo 验证，产品未移植）。
 - ⬜ **ESP8266 固件（8266 侧，未实现）**：NTP 校时、Web 配网/配置、STA_IP 推送、倒计时 tick 权威、ACK/NAK/BTN_EVENT/AP_READY 等协议设计命令。51 端已为其预留全部帧与字段，模拟测试脚本见 `firmware/STC/test/uart_8266_sim.py` 与 `plan/8266串口测试计划.md`。
