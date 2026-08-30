@@ -5,13 +5,14 @@
 #define EEP_SIZE  512
 #define MAGIC     0x5A
 
-/* 布局：magic(1) wifi_ssid(32) wifi_pwd(64) ap_pwd(16) cfg_blob(54) cd(1) */
+/* 布局：magic(1) wifi_ssid(32) wifi_pwd(64) ap_pwd(16) cfg_blob(54) cd_min(1) cd_sec(1) */
 #define OFF_MAGIC    0
 #define OFF_SSID     1
 #define OFF_PWD      33
 #define OFF_AP_PWD   97
 #define OFF_CFG      113
-#define OFF_CD       167
+#define OFF_CD_MIN   167
+#define OFF_CD_SEC   168
 
 static void putc(size_t o, uint8_t v) { EEPROM.write(o, v); }
 
@@ -60,5 +61,6 @@ const char *store_get_ap_pwd() {
 
 void store_save_cfg_blob() { for (int i = 0; i < CFG_LEN; i++) putc(OFF_CFG + i, g_cfg[i]); EEPROM.commit(); }
 
-void store_save_cd(uint8_t preset_min) { putc(OFF_CD, preset_min ? preset_min : 5); EEPROM.commit(); }
-uint8_t store_get_cd() { uint8_t v = EEPROM.read(OFF_CD); return (v >= 1 && v <= 99) ? v : 5; }
+void store_save_cd(uint8_t preset_min, uint8_t preset_sec) { putc(OFF_CD_MIN, preset_min ? preset_min : 5); putc(OFF_CD_SEC, preset_sec); EEPROM.commit(); }
+uint8_t store_get_cd_min() { uint8_t v = EEPROM.read(OFF_CD_MIN); return (v >= 1 && v <= 99) ? v : 5; }
+uint8_t store_get_cd_sec() { uint8_t v = EEPROM.read(OFF_CD_SEC); return (v <= 59) ? v : 0; }

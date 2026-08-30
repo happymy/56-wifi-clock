@@ -2,18 +2,22 @@
 #include "proto.h"
 
 static uint8_t preset_min = 5;
+static uint8_t preset_sec = 0;
 static enum { CD_IDLE, CD_RUN, CD_PAUSE } st = CD_IDLE;
 static uint32_t remain_s;
 static bool ring_active;
 
-void cd_set_preset(uint8_t m) { if (m >= 1 && m <= 99) preset_min = m; }
+void cd_set_preset(uint8_t m, uint8_t s) {
+    if (m >= 1 && m <= 99) preset_min = m;
+    if (s <= 59) preset_sec = s;
+}
 
 void cd_start() {
-    /* 首帧立即推 MM:SS（十进制值字节，满时长如 5:00）；remain 从整秒计，
-       首个 tick(1s 后) 减为 4:59，帧序不重复且总时长满 preset 分钟。归零走 tick→mode2 响铃。 */
-    remain_s = (uint32_t)preset_min * 60;
+    /* 首帧立即推 MM:SS（十进制值字节，满时长如 2:45）；remain 从整秒计，
+       首个 tick(1s 后) 减为 2:44，帧序不重复且总时长满 preset。归零走 tick→mode2 响铃。 */
+    remain_s = (uint32_t)preset_min * 60 + preset_sec;
     st = CD_RUN; ring_active = false;
-    send_disp_override(DO_MODE_CD, preset_min, 0);
+    send_disp_override(DO_MODE_CD, preset_min, preset_sec);
 }
 
 void cd_pause_resume() {

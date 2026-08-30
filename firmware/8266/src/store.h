@@ -12,5 +12,6 @@ bool store_get_wifi(char *ssid, size_t ss, char *pwd, size_t ps);
 void store_set_ap_pwd(const char *p);
 const char *store_get_ap_pwd();
 void store_save_cfg_blob();     /* 备份 g_cfg */
-void store_save_cd(uint8_t preset_min);
-uint8_t store_get_cd();
+void store_save_cd(uint8_t preset_min, uint8_t preset_sec);
+uint8_t store_get_cd_min();
+uint8_t store_get_cd_sec();

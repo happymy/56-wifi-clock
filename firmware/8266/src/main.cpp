@@ -44,7 +44,7 @@ void setup() {
     Serial.begin(9600);            /* UART1 与 51 唯一链路；伪待机期间保持在线 */
     store_init();
     store_load();                  /* 载入 WiFi 凭据 / 镜像备份（g_cfg_valid 仍 false，以 51 为准） */
-    cd_set_preset(store_get_cd()); /* 载入倒计时预设（默认 5 分钟） */
+    cd_set_preset(store_get_cd_min(), store_get_cd_sec()); /* 载入倒计时预设（默认 5 分） */
     send_disp_override(DO_MODE_FREE, 0, 0);  /* 上电清 51 残留 cd_disp（协议 §6.3：释放仅靠 mode0，防卡屏） */
     wifi_setup();
     bool ap = (WiFi.getMode() & WIFI_AP);

@@ -5,7 +5,7 @@
 
 #include <Arduino.h>
 
-void cd_set_preset(uint8_t min);
+void cd_set_preset(uint8_t min, uint8_t sec);
 void cd_start();                 /* 按预设分钟启动 */
 void cd_pause_resume();
 void cd_cancel();                /* 回发 mode0 释放显示 */
