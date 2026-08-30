@@ -93,7 +93,7 @@ CODE 末端(独占地址) = s_XINIT 地址 + XINIT Size
 STC 芯片靠串口下载（"先点下载、再上电"）：
 
 1. USB-TTL：TX→MCU RX(P3.0)、RX→MCU TX(P3.1)、GND 共地，MCU 上电前先不上电；
-2. STC-ISP（官方 Windows 工具，选 STC15W408AS，IRC 频率按板子实际）打开 `out/firmware.hex`，点"下载/编程"；
+2. STC-ISP（官方 Windows 工具，选 STC15W408AS，IRC 频率选 **11.051MHz**——板载实测值，见 `plan/硬件生产测试计划.md`）打开 `out/firmware.hex`，点"下载/编程"；
 3. 给 MCU 上电（或按复位）即完成。
 
 > 命令行可选 `stcgal`：`python -m stcgal -P stc15 -p COMx out\firmware.hex`
