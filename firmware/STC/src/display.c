@@ -52,7 +52,7 @@ void disp_render(unsigned char mode, const __xdata ds_time *t, int temp_x10,
         disp[3] = seg_font[t->min & 0x0F];
         put_smg2(disp, (t->sec >> 4) & 0x0F, (t->sec & 0x0F));
         if (smg1_sel == 0) {          /* SMG1=温度(整°C), 个位(GRID5)小数点亮 */
-            unsigned char td = abs_div10(temp_x10);
+            unsigned char td = abs_div10((temp_x10 <= -990) ? 250 : temp_x10);  /* -999 哨兵兜底 25°C, 同 DISP_TEMP */
             disp[5] = seg_font[td / 10]; disp[4] = seg_font[td % 10] | 0x80;
         } else {                      /* SMG1=日期(日 DD, BCD 2位) */
             disp[5] = seg_font[(t->date >> 4) & 0x0F]; disp[4] = seg_font[t->date & 0x0F];
