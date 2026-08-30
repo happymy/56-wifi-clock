@@ -76,23 +76,24 @@ static void render_bright_adj(__xdata unsigned char *disp, unsigned char val, un
     }
 }
 
-/* 时间设置：字段 0年1月2日3时4分5秒6星期，blink 闪烁当前字段；星期 0-6(0=周日) */
+/* 时间设置：字段 0年1月2日3星期4时5分6秒（同 SET_TIME 协议序），blink 闪烁当前字段；
+   星期 0-6(0=周日)，SMG1 左显数值、右管恒空（突出星期、防与时/分弄混） */
 static void render_setting(__xdata unsigned char *disp, const __xdata ds_time *t, unsigned char idx, unsigned char blank) {
     unsigned char s1t, s1o, s2t, s2o, bs1, bs2;
     s1t = (t->date >> 4) & 0x0F; s1o = t->date & 0x0F;    /* SMG1 默认:日(BCD 直取) */
     s2t = (t->sec  >> 4) & 0x0F; s2o = t->sec  & 0x0F;    /* SMG2 默认:秒 */
     if (idx == 1) { s1t = (t->month >> 4) & 0x0F; s1o = t->month & 0x0F; }  /* 月 */
     if (idx == 0) { s2t = (t->year >> 4) & 0x0F;  s2o = t->year  & 0x0F; }  /* 年 */
-    if (idx == 6) { s1t = 0; s1o = t->weekday & 0x0F; }     /* 星期 (0-6 单数字) */
+    if (idx == 3) s1t = t->weekday & 0x0F;                    /* 星期: 左显数值, 右管恒空 */
 
-    disp[0] = (idx == 3 && blank) ? 0x00 : seg_font[(t->hr  >> 4) & 0x0F];
-    disp[1] = (idx == 3 && blank) ? 0x00 : seg_font[t->hr  & 0x0F];
-    disp[2] = seg_rotate180((idx == 4 && blank) ? 0x00 : seg_font[(t->min >> 4) & 0x0F]);
-    disp[3] = (idx == 4 && blank) ? 0x00 : seg_font[t->min & 0x0F];
-    bs1 = (idx == 1 || idx == 2 || idx == 6) && blank;   /* SMG1 闪: 月1/日2/星期6 */
-    bs2 = (idx == 0 || idx == 5) && blank;               /* SMG2 闪: 年0/秒5 */
+    disp[0] = (idx == 4 && blank) ? 0x00 : seg_font[(t->hr  >> 4) & 0x0F];
+    disp[1] = (idx == 4 && blank) ? 0x00 : seg_font[t->hr  & 0x0F];
+    disp[2] = seg_rotate180((idx == 5 && blank) ? 0x00 : seg_font[(t->min >> 4) & 0x0F]);
+    disp[3] = (idx == 5 && blank) ? 0x00 : seg_font[t->min & 0x0F];
+    bs1 = (idx == 1 || idx == 2 || idx == 3) && blank;   /* SMG1 闪: 月1/日2/星期3 */
+    bs2 = (idx == 0 || idx == 6) && blank;               /* SMG2 闪: 年0/秒6 */
     disp[5] = bs1 ? 0x00 : seg_font[s1t];                /* SMG1 左=十位 */
-    disp[4] = bs1 ? 0x00 : seg_font[s1o];                /* SMG1 右=个位 */
+    disp[4] = (bs1 || idx == 3) ? 0x00 : seg_font[s1o];  /* SMG1 右=个位(星期恒空) */
     disp[7] = bs2 ? 0x00 : seg_font[s2t];              /* SMG2 左=十位 */
     disp[6] = bs2 ? 0x00 : seg_font[s2o];              /* SMG2 右=个位 */
 }
@@ -325,7 +326,7 @@ void main(void) {
                     }
                 } else if (tset_mode) {
                     if (ke.btn == KEY_SET && ke.ev == EV_SINGLE) {
-                        if (++tset_idx > 6) {            /* 末字段(星期)后再按：保存退出 */
+                        if (++tset_idx > 6) {            /* 末字段(秒)后再按：保存退出 */
                             tset_mode = 0;
                             ds1302_write_time(&t_set);     /* 清 CH(sec&0x7F), DS 恢复走时 */
                             clock_ok = 1;                  /* 手动设置同样结束"未校时"闪烁 */
@@ -336,10 +337,10 @@ void main(void) {
                             case 0: inc_bcd(&t_set.year, 99); if (t_set.year < 0x26) t_set.year = 0x26; break;  /* 年 2026-2099 */
                             case 1: inc_bcd(&t_set.month, 12); if (t_set.month == 0) t_set.month = 1; break;    /* 月 12→1 不设 0 */
                             case 2: inc_date(&t_set); break;
-                            case 3: inc_bcd(&t_set.hr, 23); break;
-                            case 4: inc_bcd(&t_set.min, 59); break;
-                            case 5: inc_bcd(&t_set.sec, 59); break;
-                            case 6: inc_bcd(&t_set.weekday, 6); break;   /* 星期 0-6: 0=周日 */
+                            case 3: inc_bcd(&t_set.weekday, 6); break;   /* 星期 0-6: 0=周日 */
+                            case 4: inc_bcd(&t_set.hr, 23); break;
+                            case 5: inc_bcd(&t_set.min, 59); break;
+                            case 6: inc_bcd(&t_set.sec, 59); break;
                         }
                     }
                 } else {  /* 常态: SET 控亮度/时间设置/IP; UP 手动切整屏模式; 走时SMG1选显(温度/日期)由 8266 配置 */
