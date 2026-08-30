@@ -7,7 +7,7 @@
 #define AP_SSID "56dz network clock"
 #define STA_TIMEOUT_MS 15000L
 #define SYNC_WAIT_MS   10000L
-#define IDLE_2MIN_MS   120000L
+#define IDLE_MS       300000L   /* STA 闲置断网阈值 5min：Web 访问会刷新计时（web.cpp wifi_touch），活跃配置期不断 */
 #define SYNC_RETRY_MS  60000L   /* NTP 反复失败时 60s 节流，防 do_sync 阻塞占死主循环 */
 /* NTP 服务器：国内优先，超时后整组换世界（协议 §6 NTP 列表失败递进） */
 static const char *NTP_CN[]    = { "ntp.aliyun.com", "ntp.tencent.com", "cn.ntp.org.cn", nullptr };
@@ -18,6 +18,8 @@ static bool ap_mode;
 static unsigned long last_rf_use;   /* 最近 RF 使用（STA 关联）时刻，0=从未 */
 
 bool wifi_ap_active() { return ap_mode; }
+
+void wifi_touch() { last_rf_use = millis(); }   /* Web 服务时刷新闲置计时：避免配置页被闲置断网打断 */
 
 int wifi_tz_h() {
     /* 可信时区源优先级：① 51 拉到的镜像（g_cfg_valid）；② 本地备份（store_has_cfg，
@@ -93,7 +95,7 @@ static bool do_sync() {
         while (millis() - w0 < SYNC_WAIT_MS && time(nullptr) <= 1483228800L) delay(100);
     }
     if (time(nullptr) > 1483228800L) push_set_time();   /* 2017-01-01 UTC 起才可信 */
-    /* 此处不断 RF：保持 STA 让 Web 配置页可达，闲置 2min 由 wifi_loop 定时断回伪待机（协议 §6） */
+    /* 此处不断 RF：保持 STA 让 Web 配置页可达，闲置 5min（Web 访问刷新）由 wifi_loop 定时断回伪待机（协议 §6） */
     return true;
 }
 
@@ -145,8 +147,8 @@ void wifi_loop() {
             do_sync();
         }
     }
-    /* STA 闲置 2 分钟回伪待机（协议 §6） */
-    if (last_rf_use && (now - last_rf_use) >= IDLE_2MIN_MS && (WiFi.getMode() & WIFI_STA)) {
+    /* STA 闲置 5min 回伪待机（协议 §6；Web 访问由 wifi_touch 刷新计时） */
+    if (last_rf_use && (now - last_rf_use) >= IDLE_MS && (WiFi.getMode() & WIFI_STA)) {
         WiFi.forceSleepBegin();
     }
 }

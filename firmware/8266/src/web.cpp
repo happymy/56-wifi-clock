@@ -263,6 +263,9 @@ void web_setup(bool ap) {
 }
 
 void web_loop() {
-    if (wifi_ap_active() || WiFi.isConnected()) srv.handleClient();
+    if (wifi_ap_active() || WiFi.isConnected()) {
+        wifi_touch();                                   /* 服务 Web=RF 活跃：刷新闲置计时，配置页长停留不被打断 */
+        srv.handleClient();
+    }
     /* 伪待机（RF 关/未关联）时无网可服务；仅 STA 关联或 AP 开启时轮询 */
 }

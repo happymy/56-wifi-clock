@@ -11,4 +11,5 @@ void wifi_force_sync();        /* 51 REQ_TIME → 立即触发对时 */
 void wifi_ep_ap_mode();        /* 51 ENTER_AP → 清凭据后重启进 AP */
 bool wifi_synced();            /* NTP 已同步 */
 bool wifi_ap_active();         /* 当前开 AP 配网中 */
+void wifi_touch();             /* Web 服务时刷新 STA 闲置计时（防配置中断网） */
 int  wifi_tz_h();              /* 有效时区小时(有符号)，用于 SET_TIME tz 字节 */
