@@ -266,8 +266,8 @@ def cmd_setcfg(args):
             data = bytearray(sim.echo_cfg)
             print("  (基于 51 当前配置保留其它字节)")
         else:
-            data = bytearray(54)          # 读回失败回落全 0
-            sim.echo_cfg = bytes(data)
+            sim.close()
+            raise SystemExit("REQ_CFG 回读失败，中止下发（避免把配置整体清零）。请重跑或接 51 后重试。")
     if args.smg1 is not None:
         data[21] = args.smg1 & 0xFF        # smg1_mode @ 偏移21（0=温度 1=日期）
     if args.temp_unit is not None:
