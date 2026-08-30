@@ -54,6 +54,7 @@ for cmd, pl in frames:
         d = pl
         def u(o): return d[o]
         def s(o): return d[o] - 256 if d[o] & 0x80 else d[o]
+        def bcd(o): return ((u(o) >> 4) * 10) + (u(o) & 0x0F)   # 闹钟时/分为 BCD 存储 → 转十进制显示
         print("--- decoded cfg ---")
         print("display_mode =", u(0))
         print("bright_mode  =", u(1), "(0=auto/1=manual)")
@@ -61,7 +62,7 @@ for cmd, pl in frames:
         print("temp_offset  =", s(3))
         for a in range(3):
             base = 4 + a*3
-            print(f"alarm[{a}]      = on={u(base)} {u(base+1):02d}:{u(base+2):02d}")
+            print(f"alarm[{a}]      = on={u(base)} {bcd(base+1):02d}:{bcd(base+2):02d}")
         print("tz           =", s(13))
         print("off_start    =", u(14), u(15))
         print("off_end      =", u(16), u(17))
