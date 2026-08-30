@@ -44,7 +44,7 @@ static void push_set_time() {
     b[0] = to_bcd(t.tm_year % 100);
     b[1] = to_bcd(t.tm_mon + 1);
     b[2] = to_bcd(t.tm_mday);
-    b[3] = to_bcd(t.tm_wday == 0 ? 7 : t.tm_wday); /* DS1302 星期 1–7 */
+    b[3] = to_bcd(t.tm_wday); /* 星期 0-6: 0=周日 (C tm_wday 0=Sun..6=Sat) */
     b[4] = to_bcd(t.tm_hour);
     b[5] = to_bcd(t.tm_min);
     b[6] = to_bcd(t.tm_sec);

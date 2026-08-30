@@ -32,7 +32,7 @@ void disp_render(unsigned char mode, const __xdata ds_time *t, int temp_x10,
         disp[3] = seg_font[t->date & 0x0F];
         disp[7] = seg_font[(t->year >> 4) & 0x0F];   /* SMG2 = 年份 YY(2位) */
         disp[6] = seg_font[t->year & 0x0F];
-        disp[5] = seg_font[t->weekday & 0x0F];        /* SMG1 = 星期 1-7, 不补零 */
+        disp[5] = seg_font[t->weekday & 0x0F];        /* SMG1 = 星期 0-6, 不补零 (0=周日) */
         disp[4] = 0;
     } else if (mode == DISP_TEMP) {
         int v = temp_x10;

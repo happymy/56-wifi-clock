@@ -5,7 +5,7 @@
 
 /* 显示内容模式（大屏 GRID1-4 显示的“主信息”）；SMG1(GRID5/6)/SMG2(GRID7/8) 随模式变化。
       DISP_TIME : 大屏 HH:MM，SMG2=秒 SS，SMG1 由 smg1_sel 选 温度°C(个位dp亮)/日期(日 DD)（8266 smg1_mode 固定选显，不轮换；手动 UP 可切整屏模式）
-      DISP_DATE : 大屏 MMDD（月左/日右镜像），SMG2=年份 YY，SMG1=星期 1-7（不补零）
+      DISP_DATE : 大屏 MMDD（月左/日右镜像），SMG2=年份 YY，SMG1=星期 0-6（不补零，0=周日）
       DISP_TEMP : 大屏=[符号][2位温度][C/F]，SMG1/SMG2 灭（NTC 无效兜底 25°C）
 
      ★ 铁律（见 AGENTS.md §7 / plan/原理图.md §4.3）：disp[0..7]=GRID1..GRID8。

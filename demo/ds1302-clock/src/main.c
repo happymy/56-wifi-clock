@@ -107,7 +107,7 @@ static void render(unsigned char disp[8], const ds_time *t) {
 }
 
 /* 设置模式渲染：HH:MM 大屏；SMG1/SMG2 小屏按当前字段显示，blank=1 时该字段熄灭形成闪烁。
-   set_idx: 0时 1分 2秒 3日 4月 5年 6星期 */
+   set_idx: 0年 1月 2日 3时 4分 5秒 6星期(0-6, 0=周日) */
 static void render_setting(unsigned char disp[8], const ds_time *t, unsigned char idx, unsigned char blank) {
     unsigned char H  = ((t->hr     >> 4) & 0x0F) * 10 + (t->hr     & 0x0F);
     unsigned char M  = ((t->min    >> 4) & 0x0F) * 10 + (t->min    & 0x0F);
@@ -118,18 +118,18 @@ static void render_setting(unsigned char disp[8], const ds_time *t, unsigned cha
     unsigned char W  = ((t->weekday >> 4) & 0x0F) * 10 + (t->weekday & 0x0F);
     unsigned char smg1_t = D / 10, smg1_o = D % 10;   /* SMG1 默认：日 */
     unsigned char smg2_t = S / 10, smg2_o = S % 10;   /* SMG2 默认：秒 */
-    if (idx == 4) { smg1_t = MO / 10; smg1_o = MO % 10; }  /* 月 */
-    if (idx == 5) { smg2_t = Y  / 10; smg2_o = Y  % 10; }  /* 年 */
+    if (idx == 1) { smg1_t = MO / 10; smg1_o = MO % 10; }  /* 月 */
+    if (idx == 0) { smg2_t = Y  / 10; smg2_o = Y  % 10; }  /* 年 */
     if (idx == 6) { smg1_t = 0;       smg1_o = W;        }  /* 星期 */
 
-    disp[0] = (idx == 0 && blank) ? 0x00 : seg_font[H / 10];
-    disp[1] = (idx == 0 && blank) ? 0x00 : seg_font[H % 10];
-    disp[2] = seg_rotate180((idx == 1 && blank) ? 0x00 : seg_font[M / 10]);
-    disp[3] = (idx == 1 && blank) ? 0x00 : seg_font[M % 10];
-    disp[5] = ((idx == 3 || idx == 4 || idx == 6) && blank) ? 0x00 : seg_font[smg1_t];
-    disp[4] = ((idx == 3 || idx == 4 || idx == 6) && blank) ? 0x00 : seg_font[smg1_o];
-    disp[7] = ((idx == 2 || idx == 5) && blank) ? 0x00 : seg_font[smg2_t];
-    disp[6] = ((idx == 2 || idx == 5) && blank) ? 0x00 : seg_font[smg2_o];
+    disp[0] = (idx == 3 && blank) ? 0x00 : seg_font[H / 10];
+    disp[1] = (idx == 3 && blank) ? 0x00 : seg_font[H % 10];
+    disp[2] = seg_rotate180((idx == 4 && blank) ? 0x00 : seg_font[M / 10]);
+    disp[3] = (idx == 4 && blank) ? 0x00 : seg_font[M % 10];
+    disp[5] = ((idx == 1 || idx == 2 || idx == 6) && blank) ? 0x00 : seg_font[smg1_t];
+    disp[4] = ((idx == 1 || idx == 2 || idx == 6) && blank) ? 0x00 : seg_font[smg1_o];
+    disp[7] = ((idx == 0 || idx == 5) && blank) ? 0x00 : seg_font[smg2_t];
+    disp[6] = ((idx == 0 || idx == 5) && blank) ? 0x00 : seg_font[smg2_o];
 }
 
 void main(void) {
@@ -171,13 +171,13 @@ void main(void) {
         }
         if (up && !prev_up && setting) {       /* UP 单击：当前字段 +1 */
             switch (set_idx) {
-                case 0: inc_bcd(&t_set.hr, 23); break;
-                case 1: inc_bcd(&t_set.min, 59); break;
-                case 2: inc_bcd(&t_set.sec, 59); break;
-                case 3: inc_date(&t_set); break;
-                case 4: inc_bcd(&t_set.month, 12); break;
-                case 5: inc_bcd(&t_set.year, 99); break;
-                case 6: inc_bcd(&t_set.weekday, 7); break;
+                case 0: inc_bcd(&t_set.year, 99); break;
+                case 1: inc_bcd(&t_set.month, 12); if (t_set.month == 0) t_set.month = 1; break;   /* 月 12→1 不设 0 */
+                case 2: inc_date(&t_set); break;
+                case 3: inc_bcd(&t_set.hr, 23); break;
+                case 4: inc_bcd(&t_set.min, 59); break;
+                case 5: inc_bcd(&t_set.sec, 59); break;
+                case 6: inc_bcd(&t_set.weekday, 6); break;   /* 星期 0-6: 0=周日 */
             }
         }
         prev_up = up; prev_set = set;

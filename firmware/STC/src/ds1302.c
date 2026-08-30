@@ -50,7 +50,7 @@ static void ds_write_base(void) {
     ds_write_byte(0x84, 0x00);   /* 时=00 */
     ds_write_byte(0x86, 0x26);   /* 日=26 */
     ds_write_byte(0x88, 0x08);   /* 月=08 */
-    ds_write_byte(0x8A, 0x03);   /* 周=03 */
+    ds_write_byte(0x8A, 0x03);   /* 周=03 (0-6 约定: 0=周日, 3=周三) */
     ds_write_byte(0x8C, 0x26);   /* 年=26 */
     ds_write_byte(0x8E, 0x80);   /* 写保护 */
 }
