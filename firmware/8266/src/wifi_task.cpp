@@ -1,0 +1,152 @@
+#include "wifi_task.h"
+#include "proto.h"
+#include "store.h"
+#include <ESP8266WiFi.h>
+#include <time.h>
+
+#define AP_SSID "56dz network clock"
+#define STA_TIMEOUT_MS 15000L
+#define SYNC_WAIT_MS   10000L
+#define IDLE_2MIN_MS   120000L
+#define SYNC_RETRY_MS  60000L   /* NTP 反复失败时 60s 节流，防 do_sync 阻塞占死主循环 */
+/* NTP 服务器：国内优先，超时后整组换世界（协议 §6 NTP 列表失败递进） */
+static const char *NTP_CN[]    = { "ntp.aliyun.com", "ntp.tencent.com", "cn.ntp.org.cn", nullptr };
+static const char *NTP_WORLD[] = { "time.cloudflare.com", "pool.ntp.org", "ntp.aliyun.com", nullptr };
+
+static bool synced;
+static bool ap_mode;
+static unsigned long last_rf_use;   /* 最近 RF 使用（STA 关联）时刻，0=从未 */
+
+bool wifi_ap_active() { return ap_mode; }
+
+int wifi_tz_h() {
+    /* 可信时区源优先级：① 51 拉到的镜像（g_cfg_valid）；② 本地备份（store_has_cfg，
+       覆盖 8266 重启后 store_load 已恢复但 REQ_CFG 未回的时刻，避免把 51 已设 tz 覆盖回默认 8）；
+       二者皆无才回默认 +8，防未初始化全 0 误判 tz=0。 */
+    if (!g_cfg_valid && !store_has_cfg()) return 8;
+    int8_t v = (int8_t)g_cfg[13];            /* §5 偏移13：tz 有符号原生（非 BCD） */
+    return (v >= -12 && v <= 14) ? v : 8;
+}
+
+bool wifi_synced() { return synced; }
+
+static uint8_t to_bcd(unsigned v) { return (uint8_t)((v / 10 << 4) | (v % 10)); }
+
+static void push_set_time() {
+    time_t now = time(nullptr);
+    struct tm t;
+    localtime_r(&now, &t);
+    if (t.tm_year < (2016 - 1900)) return;        /* 时钟未被 SNTP 校正，放弃 */
+    uint8_t b[8];
+    b[0] = to_bcd(t.tm_year % 100);
+    b[1] = to_bcd(t.tm_mon + 1);
+    b[2] = to_bcd(t.tm_mday);
+    b[3] = to_bcd(t.tm_wday == 0 ? 7 : t.tm_wday); /* DS1302 星期 1–7 */
+    b[4] = to_bcd(t.tm_hour);
+    b[5] = to_bcd(t.tm_min);
+    b[6] = to_bcd(t.tm_sec);
+    b[7] = (uint8_t)(int8_t)wifi_tz_h();
+    send_set_time(b);
+    synced = true;
+}
+
+/* 开 AP 配网（真实模式无 STA 时） */
+static void open_ap() {
+    ap_mode = true;
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(AP_SSID, store_get_ap_pwd());
+}
+
+/* 阻塞型流程：唤醒 RF → 连 STA → NTP 对时 → 推 SET_TIME → 保持 STA 服务 Web。
+   最长阻塞 ~35s（15s STA + 2×10s NTP），期间主循环停、Serial 不消费：
+   51 心跳/REQ_CFG 高频周期帧丢帧可容忍（会重发），CD_CTRL/REQ_TIME 稀有按键事件可重按。
+   返回 true=已连过 STA（此时可服务 Web）；false=连不上（开 AP 等配网，协议 §7）。 */
+static bool do_sync() {
+    char ssid[33], pwd[65];
+    if (!store_get_wifi(ssid, sizeof(ssid), pwd, sizeof(pwd))) {
+        if (!ap_mode) open_ap();
+        return false;
+    }
+
+    WiFi.forceSleepWake();                        /* 支持 RF_DEFAULT 默认参 */
+    delay(50);
+    WiFi.mode(WIFI_STA);
+    WiFi.softAPdisconnect(true);
+    WiFi.begin(ssid, pwd);
+    unsigned long t0 = millis();
+    while (millis() - t0 < STA_TIMEOUT_MS && WiFi.status() != WL_CONNECTED) delay(100);
+    if (WiFi.status() != WL_CONNECTED) {
+        WiFi.forceSleepBegin();
+        if (!ap_mode) open_ap();                  /* STA 连不上 → 开 AP 配网 */
+        return false;
+    }
+    ap_mode = false;
+    last_rf_use = millis();
+    send_sta_ip(WiFi.localIP());                  /* 协议 §3: 配网/对时成功后向 51 报 IP */
+
+    for (int round = 0; round < 2 && !synced; round++) {
+        const char **srv = (round == 0) ? NTP_CN : NTP_WORLD;
+        /* ponytail: 时区用整数偏移(秒)变体, DST 暂不叠加(中国无夏令时)；
+           需求方接欧美时改用 configTime(POSIX TZ 字符串)变体 */
+        configTime(wifi_tz_h() * 3600, 0, srv[0], srv[1], srv[2]);
+        unsigned long w0 = millis();
+        while (millis() - w0 < SYNC_WAIT_MS && time(nullptr) <= 1483228800L) delay(100);
+    }
+    if (time(nullptr) > 1483228800L) push_set_time();   /* 2017-01-01 UTC 起才可信 */
+    /* 此处不断 RF：保持 STA 让 Web 配置页可达，闲置 2min 由 wifi_loop 定时断回伪待机（协议 §6） */
+    return true;
+}
+
+void wifi_force_sync() { do_sync(); }
+
+void wifi_setup() {
+    WiFi.persistent(false);
+    WiFi.mode(WIFI_OFF);
+    char ssid[33], pwd[65];
+    if (!store_get_wifi(ssid, sizeof(ssid), pwd, sizeof(pwd))) {
+        open_ap();                                    /* 未配网 / ENTER_AP 后：直接开 AP 等配网 */
+        return;
+    }
+    WiFi.forceSleepBegin();                           /* 默认伪待机，首次对时由 wifi_loop 触发 */
+    last_rf_use = 0;
+}
+
+void wifi_ep_ap_mode() {
+    store_save_wifi("", "");                          /* 清 STA 凭据（协议 §3 ENTER_AP） */
+    ESP.restart();
+}
+
+void wifi_loop() {
+    static unsigned long last = 0;
+    unsigned long now = millis();
+    if (now - last < 1000) return;                    /* 1s 调度粒度 */
+    last = now;
+    if (ap_mode) return;                              /* AP 配网由 web 层 handleClient */
+
+    if (!synced) {
+        /* NTP 失败时 do_sync 最长阻塞 ~35s（15s STA + 2×20s NTP），逐秒重试会占死主循环；
+           首次立即试，失败后每 SYNC_RETRY_MS 才重试 */
+        static unsigned long retry_at = 0;
+        if (retry_at == 0 || now - retry_at >= SYNC_RETRY_MS) {
+            retry_at = now;
+            do_sync();
+        }
+        return;
+    }
+    time_t t = time(nullptr);
+    struct tm tm;
+    localtime_r(&t, &tm);
+    /* 每日 00:00/12:00 自定时对时（协议 §6）: 0点/12点为两个独立槽，各自每天触发一次 */
+    if (tm.tm_year >= (2016 - 1900) && (tm.tm_hour == 0 || tm.tm_hour == 12)) {
+        static int last_sync_key = -1;
+        int key = (tm.tm_mday * 2) + (tm.tm_hour == 12);
+        if (key != last_sync_key) {
+            last_sync_key = key;
+            do_sync();
+        }
+    }
+    /* STA 闲置 2 分钟回伪待机（协议 §6） */
+    if (last_rf_use && (now - last_rf_use) >= IDLE_2MIN_MS && (WiFi.getMode() & WIFI_STA)) {
+        WiFi.forceSleepBegin();
+    }
+}
