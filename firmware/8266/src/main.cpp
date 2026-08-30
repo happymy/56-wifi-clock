@@ -15,8 +15,9 @@ void proto_on_frame(uint8_t cmd, const uint8_t *p, uint8_t len) {
         case CMD_REQ_TIME:   /* 51 主动要时间 → 触发对时（伪待机唤醒 RF） */
             wifi_force_sync();
             break;
-        case CMD_HEARTBEAT:  /* 51 心跳 → 回网络状态 */
-            if (wifi_synced()) send_net_stat(STAT_SYNCED); else send_net_stat(0);
+        case CMD_HEARTBEAT:  /* 51 心跳 → 回网络状态：按当前实际 STA 连接（非"曾同步"粘滞标志，
+                                伪待机断网后必须报 NONE 让 51 红灯熄灭） */
+            send_net_stat((WiFi.status() == WL_CONNECTED) ? STAT_SYNCED : STAT_NONE);
             break;
         case CMD_ENTER_AP:   /* 双键≥5s → 清凭据重启进 AP 配网 */
             wifi_ep_ap_mode();
