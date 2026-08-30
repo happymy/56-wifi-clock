@@ -17,11 +17,9 @@ typedef struct {
     unsigned char snooze;            /* 贪睡 0=关 5/10=分钟 */
     unsigned char led_en;            /* 红灯指示使能: 1=开(默认) 0=关(8266 经 SET_CFG 偏移20 控制) */
     unsigned char smg1_mode;         /* SMG1 选显: 0=温度 1=日期(8266 配置, 不轮换) */
-    unsigned char rem1[6];           /* 事项提醒①（§6 结构） */
-    unsigned char rem2[6];
-    unsigned char rem3[6];
-    unsigned char rem4[6];
-    unsigned char rem5[6];
+    unsigned char chime_off_start[2];/* 整点静音窗起 时+分(0xFF=禁用), 与关屏窗独立 */
+    unsigned char chime_off_end[2];  /* 整点静音窗止 */
+    unsigned char rem[26];           /* 事项提醒预留(§6 未启用), 占原 rem1-5 区, 不位移 cd_preset/temp_unit */
     unsigned char cd_preset;         /* 倒计时预设(分 1–60, 默认5) */
     unsigned char temp_unit;         /* 0=°C 1=°F */
 } cfg_t;   /* sizeof == 54 */

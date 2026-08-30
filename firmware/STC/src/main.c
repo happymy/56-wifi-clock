@@ -215,10 +215,18 @@ static void uart_dispatch(unsigned char cmd, __xdata unsigned char *p, unsigned 
 }
 static unsigned char p_st = 0, p_cmd = 0, p_len = 0, p_idx = 0, p_chk = 0;
 static __xdata unsigned char p_buf[64];
+/* 时段命中: sh/sm=起时/分, eh/em=止时/分, th/tm=当前时/分; 起或止禁用(0xFF)返回0; 支持跨夜(纯字节比较) */
+static unsigned char in_win(unsigned char sh, unsigned char sm, unsigned char eh, unsigned char em,
+                            unsigned char th, unsigned char tm) {
+    if (sh == 0xFF || eh == 0xFF) return 0;
+    if (sh <= eh)
+        return ((th > sh) || (th == sh && tm >= sm)) && ((th < eh) || (th == eh && tm < em));
+    return !(((th < sh) || (th == sh && tm < sm)) && ((th < eh) || (th == eh && tm < em)));
+}
+
 static void uart_poll(void) {
     while (urx_r != urx_w) {
-        unsigned char b = urx[urx_r]; urx_r = (urx_r + 1) & (URX_LEN - 1);
-        switch (p_st) {
+        unsigned char b = urx[urx_r]; urx_r = (urx_r + 1) & (URX_LEN - 1);        switch (p_st) {
             case 0: if (b == 0xAA) p_st = 1; break;
             case 1: p_st = (b == 0x55) ? 2 : 0; break;
             case 2: p_cmd = b; p_chk = b; p_st = 3; break;
@@ -379,12 +387,16 @@ void main(void) {
 
         ds1302_read_time(&t);
 
+        /* 关屏窗：off_start/off_end 命中→整屏灭（§七, 须放显示填充后） */
+        unsigned char off_on = in_win(cfg.off_start[0], cfg.off_start[1], cfg.off_end[0], cfg.off_end[1], t.hr, t.min);
+        /* 整点静音窗：与关屏窗独立, 命中仅静音整点报时 */
+        unsigned char chime_off_on = in_win(cfg.chime_off_start[0], cfg.chime_off_start[1], cfg.chime_off_end[0], cfg.chime_off_end[1], t.hr, t.min);
+
         /* 分钟变化：整点报时 + 闹钟匹配(到点即接管蜂鸣, 保证0秒触发) */
         if (t.min != last_min) {
             last_min = t.min;
             if (cfg.display_mode == 1) mode = (mode < DISP_TEMP) ? (mode + 1) : DISP_TIME;  /* 8266 控制: 每分钟轮换整屏主模式 */
-            if (t.min == 0 && cfg.chime >= 1) beep_once();
-            else if (t.min == 30 && cfg.chime == 2) beep_once();
+            if (t.min == 0 && cfg.chime >= 1 && !chime_off_on) beep_once();
             {
                 unsigned char a;
                 for (a = 0; a < 3; a++) {
@@ -418,21 +430,6 @@ void main(void) {
         /* IP 显示 3s 倒计时 */
         if (ip_disp) { if (ip_ticks) ip_ticks--; else ip_disp = 0; }
 
-        /* 关屏时段：off_start/off_end = [时,分]，0xFF=禁用；支持跨夜（纯字节比较省 overlay） */
-        {
-            unsigned char off_on = 0;
-            if (cfg.off_start[0] != 0xFF && cfg.off_end[0] != 0xFF) {
-                unsigned char sh = cfg.off_start[0], sm = cfg.off_start[1];
-                unsigned char eh = cfg.off_end[0],   em = cfg.off_end[1];
-                unsigned char th = t.hr, tm = t.min;
-                if (sh <= eh)
-                    off_on = ((th > sh) || (th == sh && tm >= sm)) && ((th < eh) || (th == eh && tm < em));
-                else
-                    off_on = !(((th < sh) || (th == sh && tm < sm)) && ((th < eh) || (th == eh && tm < em)));
-            }
-            if (off_on) { unsigned char i; for (i = 0; i < 8; i++) disp[i] = 0; }
-        }
-
         /* 状态灯：已联网同步则点亮(红灯可由 8266 经 cfg.led_en 关闭) */
         if (cfg.led_en && net_status >= 2) LED_ON(); else LED_OFF();
 
@@ -460,6 +457,8 @@ void main(void) {
             if (clock_ok) disp_render(mode, &t, temp_x10, smg1_rot, disp);
             else { unsigned char i; for (i = 0; i < 8; i++) disp[i] = blink ? 0x7F : 0x00; } /* 未校时:全段闪 */
         }
+        /* 关屏窗：off_on 命中则整屏灭(必须放显示填充之后, 见§七)；响铃时强制亮屏；整点静音由 chime_off_on 独立控制 */
+        if (off_on && !ring_alarm) { unsigned char i; for (i = 0; i < 8; i++) disp[i] = 0; }
         tm1639_write_display(disp);
 
         /* 走时: 大屏恒 HH:MM; SMG1 由 cfg.smg1_mode 固定选 温度/日期(8266 配置, 不轮换) */

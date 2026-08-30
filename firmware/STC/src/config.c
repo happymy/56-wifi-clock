@@ -29,12 +29,12 @@ void cfg_defaults(void) {
     cfg.off_start[0] = 0xFF; cfg.off_start[1] = 0xFF;   /* 关屏禁用 */
     cfg.off_end[0]   = 0xFF; cfg.off_end[1]   = 0xFF;
     cfg.chime = 0;
+    cfg.chime_off_start[0] = 0xFF; cfg.chime_off_start[1] = 0xFF; /* 整点静音禁用 */
+    cfg.chime_off_end[0]   = 0xFF; cfg.chime_off_end[1]   = 0xFF;
     cfg.snooze = 5;
     cfg.led_en = 1;           /* 默认开, 保留联网亮灯行为 */
     cfg.smg1_mode = 0;         /* 默认 SMG1 显温度 */
-    for (i = 0; i < 6; i++) {
-        cfg.rem1[i] = 0; cfg.rem2[i] = 0; cfg.rem3[i] = 0; cfg.rem4[i] = 0; cfg.rem5[i] = 0;
-    }
+    for (i = 0; i < 26; i++) cfg.rem[i] = 0;
     cfg.cd_preset = 5;         /* 倒计时默认 5 分 */
     cfg.temp_unit = 0;         /* °C */
 }
