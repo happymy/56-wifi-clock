@@ -4,6 +4,7 @@ cd /d %~dp0
 setlocal
 set SDCC_BIN=C:\Program Files\SDCC\bin
 if exist "%SDCC_BIN%\sdcc.exe" set "PATH=%SDCC_BIN%;%PATH%"
+where sdcc >nul 2>nul || ( echo [ERROR] sdcc not found on PATH or in %SDCC_BIN%. Install SDCC 4.5.0 and retry. & exit /b 1 )
 if not exist out mkdir out
 sdcc -mmcs51 -I../_common -c -o out\tm1639.rel ..\_common\tm1639.c
 sdcc -mmcs51 -I../_common -c -o out\ds1302.rel ..\_common\ds1302.c

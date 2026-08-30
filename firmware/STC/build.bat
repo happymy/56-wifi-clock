@@ -6,6 +6,7 @@ REM Build STC15W408AS product firmware, 51 side
 REM local drivers in src, optimized copy; demo/_common kept for standalone demo verify
 set SDCC_BIN=C:\Program Files\SDCC\bin
 if exist "%SDCC_BIN%\sdcc.exe" set "PATH=%SDCC_BIN%;%PATH%"
+where sdcc >nul 2>nul || ( echo [ERROR] sdcc not found on PATH or in %SDCC_BIN%. Install SDCC 4.5.0 and retry. & exit /b 1 )
 if not exist out mkdir out
 set FLAGS=-mmcs51 --opt-code-size -I../../demo/_common
 sdcc %FLAGS% -c -o out\tm1639.rel src\tm1639.c

@@ -15,10 +15,11 @@
   python link_hw_test.py COM3
   依赖：pip install pyserial
 """
+import os
 import sys
 import time
 
-sys.path.insert(0, "../../STC/test")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "STC", "test"))
 from uart_8266_sim import encode, Parser, fmt_frame, open_port, NAME  # noqa: E402
 
 CFG_LEN = 54

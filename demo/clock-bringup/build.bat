@@ -6,6 +6,7 @@ REM Build STC15W408AS demo (clock-bringup) with SDCC
 REM shared drivers live in ../_common; this demo only adds src/main.c
 set SDCC_BIN=C:\Program Files\SDCC\bin
 if exist "%SDCC_BIN%\sdcc.exe" set "PATH=%SDCC_BIN%;%PATH%"
+where sdcc >nul 2>nul || ( echo [ERROR] sdcc not found on PATH or in %SDCC_BIN%. Install SDCC 4.5.0 and retry. & exit /b 1 )
 if not exist out mkdir out
 sdcc -mmcs51 -I../_common -c -o out\tm1639.rel ../_common\tm1639.c
 sdcc -mmcs51 -I../_common -c -o out\main.rel src\main.c
