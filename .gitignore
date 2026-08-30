@@ -1,5 +1,4 @@
 *.ihx
-*.hex
 *.asm
 *.lst
 *.map
@@ -11,13 +10,19 @@
 *.rst
 .playwright-mcp/
 
-# 构建产物（SDCC 输出 + 日志）
-firmware/STC/out/
+# 构建中间产物（SDCC 输出 + 日志）
+**/out/*
+!**/out/firmware.hex
 firmware/STC/build.log
 
 # Python 缓存（任意位置）
 __pycache__/
 *.pyc
 
-# PlatformIO 构建产物
-.pio/
+# PlatformIO 构建产物：排除所有中间产物，放行固件 firmware.bin
+firmware/8266/.pio/*
+!firmware/8266/.pio/build/
+firmware/8266/.pio/build/*
+!firmware/8266/.pio/build/esp01_1m/
+firmware/8266/.pio/build/esp01_1m/*
+!firmware/8266/.pio/build/esp01_1m/firmware.bin
