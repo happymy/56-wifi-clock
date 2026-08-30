@@ -253,7 +253,7 @@ void main(void) {
 
     __xdata unsigned char ip_disp = 0;           /* 显示配网 IP 末段 ~3s */
     __xdata unsigned int ip_ticks = 0;
-    __xdata unsigned char hb_tick = 0, boot_t = 8, ap_sent = 0;
+    __xdata unsigned char hb_tick = 0, boot_t = 20, ap_sent = 0;   /* 握手窗口≈5s(20拍×250ms): 8266 启动常>2s, 2026实测放宽; 无8266时进调试模式延至~5s(可接受) */
     __xdata unsigned char both_cnt = 0;          /* 双键同按计时(外循环拍, 满21≈5s) */
     __xdata unsigned int light;
     __xdata int temp_x10;
