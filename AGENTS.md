@@ -45,3 +45,16 @@
   - **铁律**：① 任何模式写到 `disp[2]` 的段码都必先过 `seg_rotate180`；② SMG 的**十位永远送左管（disp[5]/disp[7]）、个位送右管（disp[4]/disp[6]）**；③ TIME/DEMP/DATE 三模式须保持同一约定，改一处须核对全部三处与 `bin2`/`put_smg2`。
 - **按键引脚以原理图/新版时钟功能.md 为准**：`UP=P3.2`、`SET=P3.3`（active-low）；`keys.c` 依此映射。`delay_ms(10)` 主循环快扫（~10ms/拍）识别单击/双击(~120ms 窗)/长按(~1s)；若复测按键仍反，查硬件焊接而非改固件。
 - **温度值约定**：`ntc_temp_x10()` / `temp_x10` = **摄氏度 ×10（有符号 int，0.1°C 精度）**；开路/短接返回哨兵值 `-999`，调用处须先判此值再兜底（TEMP 模式 `v<=-990` 显 25°C）。**禁止把 ×10 当 ×100 用**（曾误写 `2500` 致整屏 `250°C`）。`temp_x10` 本身恒为 °C×10；°F 仅改渲染标识（`C`↔`F`），由 `display.c` 渲染时换算（`v + (v>>1)+(v>>2)+(v>>4)+320`，纯移位，免除法库）。
+
+## 8. 8266 侧固件（ESP-01S）开发规则
+> 适用：`firmware/8266/`（ESP8266 端，自写固件）。51 端开发已收尾，本规则约束 8266 侧。权威依据：`plan/串口通信协议.md`（§5 54B 配置）、`plan/新版时钟功能.md`（伪待机/倒计时/两页分离）、`firmware/8266/编程计划.md`。
+
+- **可用容量红线**：ESP-01S 为 **1MB（8Mbit）外部 flash**。本项目 **不用 OTA/不用文件系统**，选 **1M(no SPIFFS/OTA) 分区** → 程序区约 **862KB**、EEPROM 模拟 16KB（Arduino core 官方 Boards 配置）。**Web 页面等静态内容全部内嵌 PROGMEM（`F("...")`）字符串**，绝不依赖 LittleFS/SPIFFS 外部文件。
+- **RAM 红线**：ESP8266 用户可用堆约 **80KB**（IRAM 受限）。Web 响应一律 `F()` 存储、避免大 `String` 堆碎片；**禁止引入任何 JS/CSS 大框架**（jQuery/Bootstrap 等）。
+- **Web UI 用户友好、简单实用**：UI 是给不熟悉配置的普通人用的——中文文案、单页原生表单（`<form method=post>`）、默认值回填、提交后回显结果。**两页严格分离**：① AP 配网页（`192.168.4.1`）只填 WiFi 账号，其余一项不设，配网成功即关 AP；② STA 配置页（同网段 IP）全功能单页。
+- **状态机与调度**（按 `plan/串口通信协议.md §6` 伪待机）：CPU 常驻 + RF 关（`WiFi.forceSleepBegin()`）；仅对时/开 AP 时 `forceSleepWake()`；STA 关联后闲置 2 分钟自动断回伪待机；每日 00:00/12:00 自定时对时。**永不 deep-sleep**（硬件无唤醒线）。
+- **倒计时权威在 8266**：维护倒计时 tick，每 1s 推 `DISP_OVERRIDE(0x89) mode1[mm,ss]`（mm/ss 传**十进制值字节**，禁按十六进制）；归零推 mode2 响铃；收到 51 `CD_CTRL(0x05)`=0 暂停/恢复、1 取消（取消后须回发 mode0 真释放显示）。
+- **SET_CFG 完整性铁律（51 侧整帧覆盖，不做字节级合并）**：8266 必须维护**完整 54B 镜像**：上线先发 `REQ_CFG(0x87)` 拉当前值作底；改某字段只改镜像对应字节，再整帧 `SET_CFG(0x82,54B)` 下发。**严禁只发想改的字节其余填 0**，否则清空 51 亮度等按键值。闹钟时/分在 54B 中为 **BCD**（`0x15`=15点），下发前必须换算。
+- **对时与 NTP**：`configTime(tz, 0, ntp[], ...)` → `time(nullptr)` 得本地时间，换算 BCD 组 `SET_TIME(0x81) 8B` 下发 51；NTP 服务器按协议列表失败递进（国内 3 + 国外 2）。DST 需在换算时叠加。
+- **文档纪律（同 §4，禁猜 API）**：8266 一切 API（Arduino core `ESP8266WebServer`/`WiFi.forceSleep*`/`configTime`/`EEPROM` 等）**一律先查官方文档**（arduino-esp8266.readthedocs.io；裸 SDK → espressif.com）再写；说不准就查已装 core 头文件/库源码。
+- **构建与验收**：工程为 PlatformIO（`platformio.ini` 锁定 `espressif8266` platform + `framework=arduino` + 1MB 分区）。每次改完 `pio run` 零错误零告警；烧录 `pio run -t upload`（ESP-01S GPIO0 拉低进下载模式）。协议逻辑对照 `firmware/STC/test/` 既有脚本语义。
