@@ -9,6 +9,7 @@
 #define SYNC_WAIT_MS   10000L
 #define IDLE_MS       300000L   /* STA 闲置断网阈值 5min：Web 访问会刷新计时（web.cpp wifi_touch），活跃配置期不断 */
 #define SYNC_RETRY_MS  60000L   /* NTP 反复失败时 60s 节流，防 do_sync 阻塞占死主循环 */
+#define LED_WIFI      2         /* 蓝 LED6 + 板载 LED 并联同驱动（active-low），方案A：AP 配网时亮、其余灭 */
 /* NTP 服务器：国内优先，超时后整组换世界（协议 §6 NTP 列表失败递进） */
 static const char *NTP_CN[]    = { "ntp.aliyun.com", "ntp.tencent.com", "cn.ntp.org.cn", nullptr };
 static const char *NTP_WORLD[] = { "time.cloudflare.com", "pool.ntp.org", "ntp.aliyun.com", nullptr };
@@ -55,6 +56,7 @@ static void push_set_time() {
 /* 开 AP 配网（真实模式无 STA 时） */
 static void open_ap() {
     ap_mode = true;
+    digitalWrite(LED_WIFI, LOW);      /* 蓝/板载 LED 亮：配网模式指示（active-low） */
     WiFi.mode(WIFI_AP);
     WiFi.softAP(AP_SSID, store_get_ap_pwd());
 }
@@ -83,6 +85,7 @@ static bool do_sync() {
         return false;
     }
     ap_mode = false;
+    digitalWrite(LED_WIFI, HIGH);     /* 出 AP 配网态 → 蓝灯灭 */
     last_rf_use = millis();
     send_sta_ip(WiFi.localIP());                  /* 协议 §3: 配网/对时成功后向 51 报 IP */
 
@@ -102,6 +105,8 @@ static bool do_sync() {
 void wifi_force_sync() { do_sync(); }
 
 void wifi_setup() {
+    pinMode(LED_WIFI, OUTPUT);
+    digitalWrite(LED_WIFI, HIGH);     /* 蓝/板载 LED 初始灭（伪待机）；仅 AP 配网时亮（方案A） */
     WiFi.persistent(false);
     WiFi.mode(WIFI_OFF);
     char ssid[33], pwd[65];
