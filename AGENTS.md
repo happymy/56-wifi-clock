@@ -49,7 +49,7 @@
 ## 8. 8266 侧固件（ESP-01S）开发规则
 > 适用：`firmware/8266/`（ESP8266 端，自写固件）。51 端开发已收尾，本规则约束 8266 侧。权威依据：`plan/串口通信协议.md`（§5 54B 配置）、`plan/新版时钟功能.md`（伪待机/倒计时/两页分离）、`firmware/8266/编程计划.md`。
 
-- **可用容量红线**：ESP-01S 为 **1MB（8Mbit）外部 flash**。本项目 **不用 OTA/不用文件系统**，选 **1M(no SPIFFS/OTA) 分区** → 程序区约 **862KB**、EEPROM 模拟 16KB（Arduino core 官方 Boards 配置）。**Web 页面等静态内容全部内嵌 PROGMEM（`F("...")`）字符串**，绝不依赖 LittleFS/SPIFFS 外部文件。
+- **可用容量红线**：ESP-01S 为 **1MB（8Mbit）外部 flash**。本项目 **不用 OTA/不用文件系统**，`platformio.ini` 锁 `board_build.ldscript = eagle.flash.1m.ld`（1M no SPIFFS/OTA）→ **irom 程序区约 999KB（ld `len=0xf9ff0`=1023984B，即构建输出的 `1023984` 上限）**、EEPROM 模拟保留区 **4KB（1 sector）**（store 仅 `begin(512)`）。注意：**勿引 `1m256.ld` 的 762KB/761840B**（那是带 256KB SPIFFS 布局的数，本项目不用）。**Web 页面等静态内容全部内嵌 PROGMEM（`F("...")`）字符串**，绝不依赖 LittleFS/SPIFFS 外部文件。
 - **RAM 红线**：ESP8266 用户可用堆约 **80KB**（IRAM 受限）。Web 响应一律 `F()` 存储、避免大 `String` 堆碎片；**禁止引入任何 JS/CSS 大框架**（jQuery/Bootstrap 等）。
 - **Web UI 用户友好、简单实用**：UI 是给不熟悉配置的普通人用的——中文文案、单页原生表单（`<form method=post>`）、默认值回填、提交后回显结果。**两页严格分离**：① AP 配网页（`192.168.4.1`）只填 WiFi 账号，其余一项不设，配网成功即关 AP；② STA 配置页（同网段 IP）全功能单页。
 - **状态机与调度**（按 `plan/串口通信协议.md §6` 伪待机）：CPU 常驻 + RF 关（`WiFi.forceSleepBegin()`）；仅对时/开 AP 时 `forceSleepWake()`；STA 关联后闲置 2 分钟自动断回伪待机；每日 00:00/12:00 自定时对时。**永不 deep-sleep**（硬件无唤醒线）。

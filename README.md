@@ -11,7 +11,7 @@
   - 上排 `SMG2` → GRID7/8（`5612B` 双位）：TIME 显秒 `SS`、DATE 显年份 `YY`、TEMP 灭。
   - 段序 SEG1=a … SEG8=dp（字节序 dp,g,f,e,d,c,b,a）
 - **时钟**：DS1302，CE=P1.3 / DSDA=P1.4 / DSCL=P1.5，CR1220 备电走时。
-- **WiFi**：ESP-01S(ESP8266)，UART(P3.0/P3.1)，AP 热点 `56dz network clock` / `56dz.com`，Web 配网 192.168.4.1；ESP 侧自写固件，与 51 用自定义串口协议通信。
+- **WiFi**：ESP-01S(ESP8266)，UART(P3.0/P3.1)，AP 热点 `56dz network clock`（无密码，`192.168.4.1` 配网页），STA 配置页为同网段 IP；ESP 侧自写固件（`firmware/8266`），与 51 用自定义串口协议通信。
   - **按键**：UP(P3.2/INT0)、SET(P3.3/INT1)。产品固件 `firmware/STC` 语义：单击 SET→手动调亮度、双击 SET→显示联网 IP 末段(+对时)、长按 SET→手动设时间(字段循环,闰年感知)；单击 UP→循环整屏模式(TIME→DATE→TEMP)、双击 UP→恢复走时、长按 UP→计时器(起/停/复位)；两键同按持续 ≥5s→清 WiFi 凭据并重进 AP 配网(带 850ms 手势锁,整段手势直到两键都松)；任意键停响铃、UP 贪睡。`demo/clock-bringup` 测试固件按键语义见各自目录。
 - **其它**：BEEP(P2.1) 蜂鸣器；GM(P1.0)/RM(P1.1) 光敏/热敏采样；LED_T(P1.2 红)；LED_WIFI = LED6（蓝色，由 ESP GPIO2/引脚2 驱动）在 ESP 侧，勿与 8266 板载 LED 混淆。
 - 引脚明细与器件连接见 `plan/原理图.md`（权威）。
@@ -70,7 +70,7 @@ firmware/         正式产品固件（按 MCU 分目录）
     BUILD.md        构建环境与 CODE 上限 8192B 红（改动前必读）
     编程计划.md      固件（再）开发计划
     build.bat       编译脚本（SDCC，正式构建入口）
-  8266/              8266 侧固件占位（未实现，仅 .gitkeep）
+  8266/              ESP-01S 固件（PlatformIO，配网/Web 配置/倒计时权威/伪待机/NTP）
 ```
 
 **`firmware/STC/src/` 源码明细**：
@@ -115,7 +115,7 @@ STC 芯片靠串口下载，流程是“先点下载、再上电”：
 - ✅ **传感器热敏温度 + 单点补偿**（temp_offset 由 8266 下推）、EEPROM 持久化（IAP）、三组闹钟、状态指示灯重构、计时器（51 原生 MM:SS 封顶 99:59）——均已完成。
 - ✅ **51 固件研发结束（v1.0.7）**：功能与硬件实机测试全部完成——串口协议帧（SET_CFG/对时/自动轮显/闹钟贪睡/计时器/°F 换算/日期/温度）逐项实机验证通过；`temp_offset` 单位（整数°C）实测标定；`SET_CFG` 读回防清零修复。51 端开发**收尾结束**，后续仅有随 8266 联调的排障性微调，不再有新功能开发。CODE 8182/8192B（余 10B）。
 - ⚠️ **已裁撤 / 未移植功能（代码完成度见 `plan/新版时钟功能.md` §十九）**：整点报时（曾 100% 实现后移除）、事项提醒 rem1–5（0% 从未实现）、计时器「时」位（0%）、IP 4 段滚动（曾实现后简化为 P+末段）、极暗软件 PWM（仅 demo 验证，产品未移植）。
-- ⬜ **ESP8266 固件（8266 侧，未实现）**：NTP 校时、Web 配网/配置、STA_IP 推送、倒计时 tick 权威、ACK/NAK/BTN_EVENT/AP_READY 等协议设计命令。51 端已为其预留全部帧与字段，模拟测试脚本见 `firmware/STC/test/uart_8266_sim.py` 与 `plan/8266串口测试计划.md`。
+- ✅ **ESP8266 固件（firmware/8266，已实现）**：NTP 校时、两页 Web 配置（AP 配网 + STA 全功能）、STA_IP 推送、倒计时 tick 权威（DISP_OVERRIDE 显示接管）、伪待机（CPU 常驻 + RF 关 + 闲置 2min 断网）。`pio run` 零错零告警，真机 `link_hw_test.py` S1–S10 全绿。协议设计命令 ACK/NAK/BTN_EVENT/AP_READY 等**按要求未实现/未消费**（见 `plan/串口通信协议.md` 与 §8266 下述）。参考脚本见 `firmware/STC/test/uart_8266_sim.py`、`plan/8266串口测试计划.md`。
 
 ## 版本里程碑
 | Tag | 说明 |
