@@ -252,12 +252,22 @@ def cmd_settime(args):
 def cmd_setcfg(args):
     sim = Sim(args.port, args.baud)
     if args.file:
+        # 显式文件：以文件字节为底（完整覆盖，恰如真实 8266 下发快照）
         with open(args.file, "rb") as f:
             data = bytearray(f.read(54))
         if len(data) < 54:
             data = data + bytes(54 - len(data))
     else:
-        data = bytearray(54)
+        # 仅字段模式：先 REQ_CFG 读回 51 当前配置作底，只覆盖命令行字段，
+        # 不破坏亮度等按键值（对齐真实 8266 的行为，避免全 0 清零）。
+        sim.send(CMD_REQ_CFG)
+        time.sleep(0.3)
+        if sim.echo_cfg is not None and len(sim.echo_cfg) == 54:
+            data = bytearray(sim.echo_cfg)
+            print("  (基于 51 当前配置保留其它字节)")
+        else:
+            data = bytearray(54)          # 读回失败回落全 0
+            sim.echo_cfg = bytes(data)
     if args.smg1 is not None:
         data[21] = args.smg1 & 0xFF        # smg1_mode @ 偏移21（0=温度 1=日期）
     if args.temp_unit is not None:
@@ -266,8 +276,6 @@ def cmd_setcfg(args):
         data[0] = args.rotate & 0xFF        # display_mode @ 偏移0（0=不自动轮显 1=自动轮显）
     if args.led is not None:
         data[20] = args.led & 0xFF          # led_en @ 偏移20（1=开 0=关红灯）
-    elif not args.file:
-        data[20] = 1                         # 默认开(联网亮灯)
     sim.our_cfg = bytes(data)
     sim.send(CMD_SET_CFG, bytes(data))
     time.sleep(0.3)
