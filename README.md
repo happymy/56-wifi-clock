@@ -4,7 +4,7 @@
 
 ## 硬件概览
   - **MCU**：STC15W408AS — 1T 8051，内部 IRC 实测 11.051MHz，8KB Flash，512B RAM，5KB 片内 EEPROM（512B/扇区，起始 0x0000，地址空间 0x0000–0x13FF），10-bit ADC(P1.0–P1.7)，3 定时器，INT0/INT1(P3.2/P3.3)。
-  - **CODE 容量已探测确认 = 8KB（8192B）**：5KB EEPROM 为**数据空间**，芯片不能从中取指执行，故无法用于缩减 CODE；仅作 M11 配置持久化。固件区上限 **8192B（8KB Flash）**，当前构建末端 **0x1FF0（8177B）**，余 15B（用户环境约 +4B → 8181 仍过 8192，零错误零告警，SDCC `--opt-code-size`）。计时器（51 原生）已实装、倒计时显示接管移 8266（见 `plan/新版时钟功能.md` §四/§五/§十八 容量取舍）；亮度主用 TM1639 自带 8 档硬件占空比（自动/手动）；极暗软件 PWM（≈1/1024）仅在 `demo/clock-bringup` 验证，**产品固件未移植**（见 `plan/新版时钟功能.md` §十九）。
+  - **CODE 容量已探测确认 = 8KB（8192B）**：5KB EEPROM 为**数据空间**，芯片不能从中取指执行，故无法用于缩减 CODE；仅作 M11 配置持久化。固件区上限 **8192B（8KB Flash）**，当前构建末端 **0x1FF6（8182B）**，余 10B（用户环境约 +4B → 8186 仍过 8192，零错误零告警，SDCC `--opt-code-size`）。计时器（51 原生）已实装、倒计时显示接管移 8266（见 `plan/新版时钟功能.md` §四/§五/§十八 容量取舍）；亮度主用 TM1639 自带 8 档硬件占空比（自动/手动）；极暗软件 PWM（≈1/1024）仅在 `demo/clock-bringup` 验证，**产品固件未移植**（见 `plan/新版时钟功能.md` §十九）。
 - **显示**：TM1639 三线驱动 8 位数码管（共阴）：
   - 主行 4 大管 LED2–5 → GRID1–GRID4（`FJ12101AH` 1.2"）：整屏三态，**手动 UP 切换**（单击循环 TIME→DATE→TEMP→TIME，双击恢复走时；无自动整屏轮显）——TIME `HH:MM`（冒号=GRID2/GRID3 小数点，GRID3 倒装）、DATE `MMDD`（月左/日右镜像）、TEMP `[符号][2位温度][C/F]`（NTC 无效兜底 25°C；°F 由 `cfg.temp_unit` 切换）。
   - 下排 `SMG1` → GRID5/6（`5612B` 双位）：TIME 模式由 `smg1_mode`（8266 下发，偏移21）固定选显 **温度 °C / 日期(日 DD)**（0=温度、1=日期，不轮换）；DATE 显星期 1–7；TEMP 灭。**SMG1 凡显温度个位(GRID5)小数点恒亮**。
@@ -33,29 +33,57 @@
 
 ## 目录结构
 ```
-demo/             测试/功能验证代码（每个 demo 独立目录，均有自己的 build.bat）
-  _common/        共享 STC 驱动（被各 demo 引用，不单独编译）
-    stc15.h          寄存器定义（Catium2006 官方 SDCC 头）
-    tm1639.h/.c      TM1639 三线驱动（段拆分 + GRID3 倒装补偿）
-    ds1302.c/.h      DS1302 实时时钟驱动（突发读 + 单字节写，已烧录验证）
-  clock-bringup/  显示点亮验证：滚动自测 + 光敏/热敏显示 + 亮度自动调节 + 蜂鸣器
-    src/main.c
-    build.bat
-  ds1302-clock/    实时时钟：读取 DS1302 显示时分秒，传统按键手动设置日期/时间
-    src/main.c
-    build.bat
-  uart-test/      硬件串口回环验证：UART1 自发自收，大屏左发右收、串口打印结果
-    src/main.c
-    build.bat
-  hw-test/         产线全功能自检（HWTEST）：见 plan/硬件生产测试计划.md
-    src/main.c
-    build.bat
-  firmware/         正式产品固件（按 MCU 分目录，当前为空占位）
-    STC/   (.gitkeep)  未来 STC15 侧产品固件
-    8266/  (.gitkeep)  未来 ESP8266 侧产品固件
-  doc/              数据手册 + 原版功能分析
-  plan/             原理图.md（引脚映射，权威）、固件复刻计划.md（复刻路线）
+AGENTS.md          项目规则（AI/协作必读：IO 安全红线、时钟映射、ROM 约束）
+README.md          本文件（总览 + 目录说明）
+demo/             测试/功能验证固件（每个独立目录，各有 build.bat）
+  _common/         共享 STC 驱动（被各 demo 引用，不单独编译）
+    stc15.h            寄存器定义（Catium2006 官方 SDCC 头）
+    tm1639.h/.c        TM1639 三线驱动（段拆分 + GRID3 倒装补偿）
+    ds1302.h/.c        DS1302 实时时钟驱动（突发读 + 单字节写，已烧录验证）
+  clock-bringup/   显示点亮验证：滚动自测 + 光敏/热敏显示 + 亮度自动 + 蜂鸣器
+  ds1302-clock/    实时时钟：读 DS1302 显示时分秒 + 传统手动设置日期时间
+  uart-test/       硬件串口回环验证：UART1 自发自收（Timer2 波特源 9600 8N1）
+  hw-test/         产线全功能自检（HWTEST），见 plan/硬件生产测试计划.md
+  测试用固件禁止连接8266！！！.txt  防烧写误连警告（强推挽烧 8266 的提醒）
+doc/              数据手册 + 原版功能分析
+  STC15W408AS.pdf / TM1639.pdf      芯片/驱动手册
+  doc_uart_raw.txt / upload_*.pdf   原版时钟/协议资料
+  STC15W408AS-硬件选项.md            硬件配置项说明
+  原版时钟功能.md                    原版（被复刻对象）功能分析
+plan/             设计文档（权威依据）
+  原理图.md            引脚映射与器件连接（权威）
+  串口通信协议.md       51↔8266 串口协议帧格式（含 SET_CFG 54B 偏移）
+  固件复刻计划.md       复刻路线与里程碑
+  新版时钟功能.md        51 产品固件功能/容量取舍/温度补偿
+  8266串口测试计划.md    串口联调测试计划 + 实测结果记录（§9）
+  硬件生产测试计划.md    产线物理按键测试
+firmware/         正式产品固件（按 MCU 分目录）
+  STC/            51 产品固件（STC15W408AS，主项目）
+    src/              固件源码（见下方）
+    test/             测试脚本（联调 + 离线逻辑，test/README.md 有明细）
+       uart_8266_sim.py      主驱动：冒充 8266 联调（settime/setcfg/send/...）
+       com_cfg.py            回读 54B 配置并解码（闹钟时/分按 BCD 显示）
+       display_logic_test.py 离线验证 display.c 显示逻辑
+       keys_fsm_test.py      离线验证按键 FSM
+       ring_alarm_fsm_test.py 离线验证闹钟/响铃 FSM
+       README.md              test 目录说明
+    BUILD.md        构建环境与 CODE 上限 8192B 红（改动前必读）
+    编程计划.md      固件（再）开发计划
+    build.bat       编译脚本（SDCC，正式构建入口）
+  8266/              8266 侧固件占位（未实现，仅 .gitkeep）
 ```
+
+**`firmware/STC/src/` 源码明细**：
+
+| 文件 | 作用 |
+|---|---|
+| `main.c` | 主循环 + 串口协议解析（UART1/Timer2 波特源）+ 状态机/闹钟/倒计时接管 |
+| `config.c/.h` | 54B 配置结构（`SET_CFG` 布局）+ 默认值 |
+| `display.c/.h` | TM1639 渲染 + 整屏三态（TIME/DATE/TEMP）+ SMG1/SMG2 映射 + °C/°F |
+| `ds1302.c/.h` | DS1302 实时时钟读写（BCD） |
+| `tm1639.c/.h` | TM1639 三线驱动 + 8 档亮度 + 段拆分/GRID3 倒装 |
+| `keys.c/.h` | 按键 FSM（单击/双击/长按） |
+| `eeprom.c/.h` | 片内 Data Flash（IAP 0x0000–0x13FF）配置持久化 |
 
 ## 构建
 > 需 SDCC（本机已装在 `C:\Program Files\SDCC\bin`）；各 demo 的 `build.bat` 会自动定位该路径，找不到时回退到 PATH。
