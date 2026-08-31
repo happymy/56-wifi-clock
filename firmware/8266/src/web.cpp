@@ -24,6 +24,7 @@ static const char PAGE_AP_OK[] PROGMEM =
     "<p>本热点即将关闭；时钟会在 30 秒内连上 WiFi 并对时。</p>";
 
 static void h_ap_wifi() {
+    if (!srv.hasArg("ssid") || srv.arg("ssid").length() == 0) { srv.send_P(404, HT, PSTR("<h2>404</h2>")); return; }
     store_save_wifi(srv.arg("ssid").c_str(), srv.arg("pwd").c_str());
     srv.send_P(200, HT, PAGE_AP_OK);
     delay(1000);
@@ -252,7 +253,7 @@ static void h_404() { srv.send_P(404, HT, PSTR("<h2>404</h2>")); }
 void web_setup(bool ap) {
     (void)ap;   /* 模式运行时判定，见 h_root */
     srv.on("/", HTTP_GET, h_root);
-    srv.on("/wifi", h_ap_wifi);              /* 配网页：仅 WiFi 账号 */
+    srv.on("/wifi", HTTP_POST, h_ap_wifi);   /* 配网页：仅 WiFi 账号，仅 POST（GET 访问不得清配置） */
     srv.on("/save", HTTP_POST, h_sta_save);  /* STA 全功能页 */
     srv.on("/cd", h_cd);
     srv.on("/cdstart", HTTP_POST, h_cd_start);
