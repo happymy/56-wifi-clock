@@ -147,8 +147,8 @@ static void h_sta_root() {
         srv.sendContent("</select>");
     } row_end();
 
-    /* 状态灯 */
-    row("状态灯"); chk("led_en", g_cfg[20] != 0, "亮灯(联网时)"); row_end();
+    /* 状态灯（红 LED_T，由 51 驱动，联网同步后点亮） */
+    row("状态灯(红色)"); chk("led_en", g_cfg[20] != 0, "亮灯(联网时)"); row_end();
 
     /* 关屏时段：启用开关 + 起止时/分分组 */
     {
