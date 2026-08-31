@@ -12,16 +12,30 @@ static ESP8266WebServer srv(80);
 #define HT "text/html; charset=utf-8"
 
 /* ---- AP 配网页：只填 WiFi 账号（两页分离铁律） ---- */
-static const char PAGE_AP[] PROGMEM =
-    "<meta charset=utf-8><title>56dz 时钟配网</title><h2>WiFi 时钟配网</h2>"
+static const char PAGE_AP_FIRST[] PROGMEM =
+    "<meta charset=utf-8><title>56dz 时钟配网</title><style>"
+    "b.fail{color:#c00}.hint{color:#666;font-size:13px}"
+    "</style><h2>WiFi 时钟配网</h2>";
+
+static const char PAGE_AP_FAIL[] PROGMEM =
+    "<p><b class=fail>上次配网没有成功，请仔细检查下面两项再试：</b>"
+    "<br>① WiFi 名称完全一致（区分大小写，且是 2.4GHz 网络）"
+    "<br>② 密码正确（注意大小写与特殊字符）</p>";
+
+static const char PAGE_AP_FORM[] PROGMEM =
     "<form method=post action=/wifi>"
     "WiFi 名称：<input name=ssid required autofocus><br>"
     "WiFi 密码：<input name=pwd type=password><br>"
-    "<button>连接</button></form>";
+    "<button>连接</button></form>"
+    "<p class=hint>只能连接 2.4GHz 网络。保存后本热点会关闭，时钟将在 30 秒内连接并对时；"
+    "若连接失败，本热点会自动重新打开，请回此页重试。</p>";
 
 static const char PAGE_AP_OK[] PROGMEM =
     "<meta charset=utf-8><title>成功</title><h2>已保存，尝试连接…</h2>"
-    "<p>本热点即将关闭；时钟会在 30 秒内连上 WiFi 并对时。</p>";
+    "<p>本热点即将关闭；时钟会在 30 秒内连上 WiFi 并对时。</p>"
+    "<p>若连接失败，本热点会自动重新打开，请重新连接并返回配网页检查。</p>"
+    "<p>如何查看时钟 IP：在时钟上<b>双击「SET」键</b>，大屏会显示 P + IP 末段（如 P168）；"
+    "用浏览器访问该地址即可打开设置页。</p>";
 
 static void h_ap_wifi() {
     if (!srv.hasArg("ssid") || srv.arg("ssid").length() == 0) { srv.send_P(404, HT, PSTR("<h2>404</h2>")); return; }
@@ -35,7 +49,10 @@ static void h_ap_wifi() {
 static const char HDR[] PROGMEM =
     "<meta charset=utf-8><title>56dz 时钟</title><style>"
     "td{padding:4px}tr td:first-child{text-align:right}select{min-width:5em}"
+    "p.hint{color:#666;font-size:13px}"
     "</style><h2>WiFi 时钟设置</h2>"
+    "<p class=hint>重配网：按住「SET」+「UP」两键 5 秒，将清除网络设置并重开配网热点。"
+    "<br>查看本机 IP：双击「SET」键，大屏显示 P + IP 末段（如 P168）。</p>"
     "<form method=post action=/save><table>";
 
 static const char FTR[] PROGMEM =
@@ -244,8 +261,18 @@ static void h_cd_cancel() { cd_cancel(); srv.sendHeader("Location", "/cd"); srv.
 
 /* 根页面：按当前模式分流——AP 配网页（仅 WiFi 账号） / STA 全功能页（两页分离铁律） */
 static void h_root() {
-    if (wifi_ap_active()) srv.send_P(200, HT, PAGE_AP);
-    else                  h_sta_root();
+    if (wifi_ap_active()) {
+        srv.setContentLength(CONTENT_LENGTH_UNKNOWN);
+        srv.send(200, HT, "");
+        srv.sendContent(PAGE_AP_FIRST);
+        /* 有已存凭据却仍开 AP = 上次尝试连接失败（否则不会进 AP），据此提醒用户检查 */
+        char ssid[33], pwd[65];
+        if (store_get_wifi(ssid, sizeof(ssid), pwd, sizeof(pwd)))
+            srv.sendContent(PAGE_AP_FAIL);
+        srv.sendContent(PAGE_AP_FORM);
+    } else {
+        h_sta_root();
+    }
 }
 
 static void h_404() { srv.send_P(404, HT, PSTR("<h2>404</h2>")); }
