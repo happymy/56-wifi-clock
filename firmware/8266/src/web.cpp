@@ -11,6 +11,23 @@ static ESP8266WebServer srv(80);
 
 #define HT "text/html; charset=utf-8"
 
+/* HTML 转义 &<>"'：SSID 来自周边扫描（可被伪造），嵌入页面属性/文本前必须转义防注入 */
+static size_t esc(const char *in, char *out, size_t ocap) {
+    size_t o = 0;
+    for (; *in && o + 6 < ocap; in++) {
+        switch (*in) {
+            case '&':  o += (size_t)snprintf_P(out + o, ocap - o, PSTR("&amp;"));   break;
+            case '<':  o += (size_t)snprintf_P(out + o, ocap - o, PSTR("&lt;"));    break;
+            case '>':  o += (size_t)snprintf_P(out + o, ocap - o, PSTR("&gt;"));    break;
+            case '"':  o += (size_t)snprintf_P(out + o, ocap - o, PSTR("&quot;"));  break;
+            case '\'': o += (size_t)snprintf_P(out + o, ocap - o, PSTR("&#39;"));   break;
+            default:   out[o++] = *in;
+        }
+    }
+    out[o] = 0;
+    return o;
+}
+
 /* ---- AP 配网页：只填 WiFi 账号（两页分离铁律）；样式用共享 CSS_STA ---- */
 static const char PAGE_AP_FIRST[] PROGMEM =
     "<meta charset=utf-8><title>56dz 时钟配网</title>"
@@ -201,7 +218,7 @@ static void h_sta_root() {
 
     /* 网络与时间 */
     section("网络与时间");
-    row("时区"); sel_num("tz", (signed char)g_cfg[13], -12, 14);
+    row("时区"); sel_num("tz", wifi_tz_h(), -12, 14);
     srv.sendContent("<span class=hint>北京时间 = UTC+8</span>"); row_end();
     section_end();
 
@@ -253,6 +270,7 @@ static void h_sta_save() {
     g_cfg[2] = (uint8_t)pg("bright_lvl", g_cfg[2], 1, 8);
     g_cfg[53] = (uint8_t)pg("temp_unit", g_cfg[53], 0, 1);
     g_cfg[21] = (uint8_t)pg("smg1_mode", g_cfg[21], 0, 1);
+    g_cfg[13] = (uint8_t)(signed char)pg("tz", wifi_tz_h(), -12, 14);   /* §5 偏移13：有符号时区 */
     long sn = pg("snooze", g_cfg[19], 0, 10); g_cfg[19] = (uint8_t)((sn == 5 || sn == 10) ? sn : 0);
     g_cfg[20] = (uint8_t)(srv.hasArg("led_en") ? 1 : 0);
 
@@ -303,7 +321,7 @@ static void h_sta_save() {
     if (g_cfg_valid)
         srv.sendContent(PSTR("<div class=ok>✓ 配置已保存并下推时钟（亮度、闹钟等即时生效）。</div>"));
     else
-        srv.sendContent(PSTR("<div class=warn>⚠ 时钟当前无应答，改动已暂存本机。请稍后刷新或重启时钟，使其重新同步本机配置。</div>"));
+        srv.sendContent(PSTR("<div class=warn>⚠ 时钟当前无应答，本次改动未能下推。请点击“保存全部”重试，或刷新后稍候再保存（时钟上线后才生效）。</div>"));
     srv.sendContent(PSTR("<p><a class=btn href=/>返回设置</a></p>"));
 }
 
@@ -360,16 +378,17 @@ static void h_root() {
             srv.sendContent(PSTR("<div class=empty>未扫描到附近 WiFi，请在上方手动输入。</div>"));
         for (int i = 0; i < n; i++) {
             String s = WiFi.SSID(i);
-            if (s.length() == 0 || s.indexOf('\'') != -1) continue;  /* 跳过空/含引号 SSID，防 HTML/JS 破坏 */
+            if (s.length() == 0) continue;   /* 跳过空 SSID */
             /* SSID 左对齐靠左、信号条靠右（flex space-between 见样式）；点击填入输入框 */
+            char sb[192], b[300];
+            esc(s.c_str(), sb, sizeof(sb));   /* 转义后嵌入 onclick(单引号) 与文本，防扫描 SSID 注入 */
             const char *bars = WiFi.RSSI(i) >= -60 ? "▂▄▆█"
                             : WiFi.RSSI(i) >= -70 ? "▂▄▆ "
                             : WiFi.RSSI(i) >= -80 ? "▂▄  "
                             :                       "▂   ";
             const char *note = (WiFi.encryptionType(i) == ENC_TYPE_NONE) ? "（开放）" : "";
-            char b[180];
             snprintf_P(b, sizeof(b), PSTR("<a class=wi onclick=setWifi('%s')>%s%s<span class=bars>%s</span></a>"),
-                s.c_str(), s.c_str(), note, bars);
+                sb, sb, note, bars);
             srv.sendContent(b);
         }
         WiFi.scanDelete();           /* 释放扫描结果内存 */
