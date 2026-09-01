@@ -11,26 +11,10 @@ static ESP8266WebServer srv(80);
 
 #define HT "text/html; charset=utf-8"
 
-/* ---- AP 配网页：只填 WiFi 账号（两页分离铁律） ---- */
+/* ---- AP 配网页：只填 WiFi 账号（两页分离铁律）；样式用共享 CSS_STA ---- */
 static const char PAGE_AP_FIRST[] PROGMEM =
     "<meta charset=utf-8><title>56dz 时钟配网</title>"
-    "<meta name=viewport content='width=device-width,initial-scale=1'>"
-    "<style>"
-    "body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:420px;margin:24px auto;padding:0 16px;color:#222}"
-    "h2{font-size:20px;margin:8px 0 16px}"
-    "label{display:block;margin:14px 0 4px;font-size:14px;color:#444}"
-    "input{width:100%;box-sizing:border-box;padding:8px;font-size:15px;border:1px solid #bbb;border-radius:6px}"
-    "input:focus{outline:none;border-color:#06c;box-shadow:0 0 0 2px rgba(0,102,204,.15)}"
-    "button{padding:9px 22px;font-size:15px;border:none;border-radius:6px;cursor:pointer}"
-    "button[type=submit]{background:#06c;color:#fff;margin-right:8px}"
-    "button[type=button]{background:#eee;color:#333}"
-    "b.fail{color:#c00}.hint{color:#666;font-size:13px}"
-    "#wlList{margin-top:6px;border:1px solid #e3e3e3;border-radius:6px;overflow:hidden}"
-    "#wlList .wi{padding:8px 10px;font-size:14px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:#fff;color:#222;text-decoration:none}"
-    "#wlList .wi:last-child{border-bottom:none}#wlList .wi:hover{background:#eef4ff}"
-    "#wlList .wi .bars{color:#06c;font-size:12px;letter-spacing:1px}"
-    ".empty{color:#888;font-size:14px;padding:10px;text-align:center}"
-    "</style><h2>WiFi 时钟配网</h2>";
+    "<h2>WiFi 时钟配网</h2>";
 
 static const char PAGE_AP_FAIL[] PROGMEM =
     "<p><b class=fail>上次配网没有成功，请仔细检查下面两项再试：</b>"
@@ -66,25 +50,65 @@ static void h_ap_wifi() {
     ESP.restart();    /* 重启后无 AP 凭据路径已改由 store 判定，正常走 STA */
 }
 
-/* ---- STA 配置页：全功能单页（默认值回填） ---- */
-static const char HDR[] PROGMEM =
-    "<meta charset=utf-8><title>56dz 时钟</title><style>"
-    "td{padding:4px}tr td:first-child{text-align:right}select{min-width:5em}"
-    "p.hint{color:#666;font-size:13px}"
-    "</style><h2>WiFi 时钟设置</h2>"
-    "<p class=hint>重配网：按住「SET」+「UP」两键 5 秒，将清除网络设置并重开配网热点。"
-    "<br>查看本机 IP：双击「SET」键，大屏显示 P + IP 末段（如 P168）。</p>"
-    "<form method=post action=/save><table>";
+/* ---- 共享浅色现代样式（AP 配网页/STA 配置页/倒计时页三页统一） ---- */
+static const char CSS_STA[] PROGMEM =
+    "<meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
+    "<style>"
+    "body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:420px;margin:24px auto;padding:0 16px;color:#222;line-height:1.5}"
+    "h2{font-size:20px;margin:8px 0 16px}"
+    "h3.sec{font-size:13px;color:#06c;margin:18px 0 6px;font-weight:600;letter-spacing:.5px}"
+    ".card{background:#fff;border:1px solid #e3e3e3;border-radius:10px;overflow:hidden;margin-bottom:6px}"
+    ".row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f0f0f0}"
+    ".row:last-child{border-bottom:none}"
+    ".row .lbl{flex:0 0 auto;min-width:88px;font-size:14px;color:#444}"
+    ".row .ctl{flex:1 1 auto;display:flex;flex-wrap:wrap;align-items:center;gap:6px}"
+    "select{padding:6px 8px;font-size:14px;border:1px solid #bbb;border-radius:6px;background:#fff;color:#222}"
+    "select:focus{outline:none;border-color:#06c;box-shadow:0 0 0 2px rgba(0,102,204,.15)}"
+    "input[type=radio],input[type=checkbox]{accent-color:#06c;width:17px;height:17px;vertical-align:-3px}"
+    "label.opt{display:flex;align-items:center;gap:4px;font-size:14px;color:#333;cursor:pointer;margin:0}"
+    ".hint{color:#666;font-size:12px;margin-top:2px}"
+    ".banner{background:#eef4ff;border:1px solid #c9dcff;border-radius:8px;padding:8px 12px;font-size:13px;color:#333;margin-bottom:12px}"
+    ".ok{background:#e7f6ec;border:1px solid #b7e3c4;border-radius:8px;padding:10px 12px;color:#1a7a37;font-size:14px;margin-bottom:12px}"
+    ".warn{background:#fff5e6;border:1px solid #ffd9a0;border-radius:8px;padding:10px 12px;color:#9a5b00;font-size:14px;margin-bottom:12px}"
+    "button{padding:9px 22px;font-size:15px;border:none;border-radius:6px;cursor:pointer;background:#06c;color:#fff}"
+    "button:hover{background:#0b5fd9}"
+    "a.btn{display:inline-block;padding:9px 22px;font-size:15px;border-radius:6px;background:#eee;color:#333;text-decoration:none;margin-left:8px}"
+    "a.btn:hover{background:#e2e2e2}"
+    ".foot{display:flex;align-items:center;margin-top:14px}"
+    "input[type=text],input[type=password]{width:100%;box-sizing:border-box;padding:8px;font-size:15px;border:1px solid #bbb;border-radius:6px}"
+    "input[type=text]:focus,input[type=password]:focus{outline:none;border-color:#06c;box-shadow:0 0 0 2px rgba(0,102,204,.15)}"
+    "button[type=button]{background:#eee;color:#333}"
+    "b.fail{color:#c00}"
+    "#wlList{margin-top:6px;border:1px solid #e3e3e3;border-radius:6px;overflow:hidden}"
+    "#wlList .wi{padding:8px 10px;font-size:14px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:#fff;color:#222;text-decoration:none}"
+    "#wlList .wi:last-child{border-bottom:none}#wlList .wi:hover{background:#eef4ff}"
+    "#wlList .wi .bars{color:#06c;font-size:12px;letter-spacing:1px}"
+    ".empty{color:#888;font-size:14px;padding:10px;text-align:center}"
+    "label{display:block;margin:14px 0 4px;font-size:14px;color:#444}"
+    ".wi label{display:flex;align-items:center}"
+    "</style>";
 
-static const char FTR[] PROGMEM =
-    "</table><br><button>保存</button>"
-    " <a href=/cd style=margin-left:12px>倒计时</a></form>";
+/* STA 配置页头/尾（全功能单页，默认值回填；按钮在 form 内随 /save 提交） */
+static const char HDR_STA[] PROGMEM =
+    "<title>56dz 时钟</title>"
+    "<h2>WiFi 时钟设置</h2>"
+    "<div class=banner>重配网：按住「SET」+「UP」两键 5 秒，将清除网络设置并重开配网热点。"
+    "<br>查看本机 IP：双击「SET」键，大屏显示 P + IP 末段（如 P168）。</div>"
+    "<form method=post action=/save>";
 
-/* 流式行输出 */
+static const char FTR_STA[] PROGMEM =
+    "<div class=foot><button type=submit>保存全部</button>"
+    " <a class=btn href=/cd>倒计时</a></div></form>";
+
+/* 分区标题 + 卡片包裹：section(t)/section_end() 配对 */
+static void section(const char *t) { srv.sendContent("<h3 class=sec>"); srv.sendContent(t); srv.sendContent("</h3><div class=card>"); }
+static void section_end() { srv.sendContent("</div>"); }
+
+/* 流式行输出（卡片内一行：左标签/右控件） */
 static void row(const char *label) {
-    srv.sendContent("<tr><td>"); srv.sendContent(label); srv.sendContent("</td><td>");
+    srv.sendContent("<div class=row><div class=lbl>"); srv.sendContent(label); srv.sendContent("</div><div class=ctl>");
 }
-static void row_end() { srv.sendContent("</td></tr>"); }
+static void row_end() { srv.sendContent("</div></div>"); }
 
 /* 数字下拉：lo..hi，回填 cur */
 static void sel_num(const char *name, long cur, long lo, long hi) {
@@ -101,16 +125,16 @@ static void sel_num(const char *name, long cur, long lo, long hi) {
 /* 两档单选：0/1 带自然语言标签 */
 static void radio2(const char *name, long cur, const char *l0, const char *l1) {
     char b[96];
-    snprintf_P(b, sizeof(b), cur == 0 ? PSTR("<label><input type=radio name=%s value=0 checked>%s</label>") : PSTR("<label><input type=radio name=%s value=0>%s</label>"), name, l0);
+    snprintf_P(b, sizeof(b), cur == 0 ? PSTR("<label class=opt><input type=radio name=%s value=0 checked>%s</label>") : PSTR("<label class=opt><input type=radio name=%s value=0>%s</label>"), name, l0);
     srv.sendContent(b);
-    snprintf_P(b, sizeof(b), cur != 0 ? PSTR("<label><input type=radio name=%s value=1 checked>%s</label>") : PSTR("<label><input type=radio name=%s value=1>%s</label>"), name, l1);
+    snprintf_P(b, sizeof(b), cur != 0 ? PSTR("<label class=opt><input type=radio name=%s value=1 checked>%s</label>") : PSTR("<label class=opt><input type=radio name=%s value=1>%s</label>"), name, l1);
     srv.sendContent(b);
 }
 
 /* 复选（开关） */
 static void chk(const char *name, bool on, const char *label) {
     char b[96];
-    snprintf_P(b, sizeof(b), on ? PSTR("<label><input type=checkbox name=%s checked>%s</label>") : PSTR("<label><input type=checkbox name=%s>%s</label>"), name, label);
+    snprintf_P(b, sizeof(b), on ? PSTR("<label class=opt><input type=checkbox name=%s checked>%s</label>") : PSTR("<label class=opt><input type=checkbox name=%s>%s</label>"), name, label);
     srv.sendContent(b);
 }
 
@@ -123,16 +147,23 @@ static void h_sta_root() {
        否则 sendContent 只有正文、没有响应头（ESP8266WebServer-impl.h 要求） */
     srv.setContentLength(CONTENT_LENGTH_UNKNOWN);
     srv.send(200, HT, "");
-    srv.sendContent(HDR);
+    srv.sendContent(CSS_STA);
+    srv.sendContent(HDR_STA);
 
-    /* 大屏主模式 */
+    /* 显示 */
+    section("显示");
     row("大屏显示"); radio2("display_mode", g_cfg[0], "固定时间", "自动轮换"); row_end();
+    row("下排小屏显示"); radio2("smg1_mode", g_cfg[21], "温度", "日期"); row_end();
+    section_end();
 
     /* 亮度 */
+    section("亮度");
     row("亮度模式"); radio2("bright_mode", g_cfg[1], "自动(光敏)", "手动"); row_end();
-    row("手动亮度档"); sel_num("bright_lvl", g_cfg[2], 1, 8); row_end();
+    row("手动亮度档"); sel_num("bright_lvl", g_cfg[2], 1, 8); srv.sendContent("<span class=hint>1 最暗 ~ 8 最亮</span>"); row_end();
+    section_end();
 
-    /* 温度单位 + 补偿 */
+    /* 温度 */
+    section("温度");
     row("温度单位"); radio2("temp_unit", g_cfg[53], "摄氏 °C", "华氏 °F"); row_end();
     row("温度补偿"); {
         char b[96];
@@ -148,8 +179,10 @@ static void h_sta_root() {
         sel_num("temp_offset_v", av, 0, 99);
         srv.sendContent(" 度");
     } row_end();
+    section_end();
 
-    /* 3 组闹钟：开关(独立 name) + 时/分下拉 单行 */
+    /* 闹钟 */
+    section("闹钟");
     for (int n = 0; n < 3; n++) {
         char nm[16], b[64];
         snprintf_P(b, sizeof(b), PSTR("闹钟%d%s"), n + 1, n == 0 ? "(主)" : n == 1 ? "(备用)" : "");
@@ -164,14 +197,16 @@ static void h_sta_root() {
         srv.sendContent(" 分");
         row_end();
     }
+    section_end();
 
-    /* 时区 */
-    row("时区(UTC)"); sel_num("tz", (signed char)g_cfg[13], -12, 14); row_end();
+    /* 网络与时间 */
+    section("网络与时间");
+    row("时区"); sel_num("tz", (signed char)g_cfg[13], -12, 14);
+    srv.sendContent("<span class=hint>北京时间 = UTC+8</span>"); row_end();
+    section_end();
 
-    /* SMG1 选显 */
-    row("下排小屏显示"); radio2("smg1_mode", g_cfg[21], "温度", "日期"); row_end();
-
-    /* 贪睡：仅 0(关)/5/10 三档 */
+    /* 杂项 */
+    section("其他");
     row("贪睡时长"); {
         char b[64];
         long sn = g_cfg[19];
@@ -185,8 +220,6 @@ static void h_sta_root() {
         srv.sendContent(b);
         srv.sendContent("</select>");
     } row_end();
-
-    /* 状态灯（红 LED_T，由 51 驱动，联网同步后点亮） */
     row("状态灯(红色)"); chk("led_en", g_cfg[20] != 0, "亮灯(联网时)"); row_end();
 
     /* 关屏时段：启用开关 + 起止时/分分组 */
@@ -199,8 +232,9 @@ static void h_sta_root() {
         row("  结束"); sel_num("off_e", eh == 0xFF ? 0 : eh, 0, 23); srv.sendContent(" 时 ");
                      sel_num("off_em", em == 0xFF ? 0 : em, 0, 59); srv.sendContent(" 分"); row_end();
     }
+    section_end();
 
-    srv.sendContent(FTR);
+    srv.sendContent(FTR_STA);
 }
 
 /* 表单值解析：缺省/越界回落 dflt */
@@ -254,7 +288,23 @@ static void h_sta_save() {
         send_set_cfg();               /* 完整 54B 下发（整帧覆盖，铁律） */
         store_save_cfg_blob();
     }
-    srv.send_P(200, HT, PSTR("<meta charset=utf-8><title>已保存</title><h2>已保存</h2><p>配置已下推时钟。</p><p><a href=/>返回</a></p>"));
+    char b[96];
+    srv.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    srv.send(200, HT, "");
+    /* 回显成功/失败：时钟已应答（g_cfg_valid）=下推生效；否则仅本机暂存，提示重启同步 */
+    snprintf_P(b, sizeof(b), PSTR("<meta charset=utf-8><title>保存结果</title>"
+        "<meta name=viewport content='width=device-width,initial-scale=1'>"
+        "<style>body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:420px;margin:24px auto;padding:0 16px;color:#222}"
+        ".ok{background:#e7f6ec;border:1px solid #b7e3c4;border-radius:8px;padding:12px;font-size:14px;margin-bottom:12px}"
+        ".warn{background:#fff5e6;border:1px solid #ffd9a0;border-radius:8px;padding:12px;font-size:14px;margin-bottom:12px}"
+        "a.btn{display:inline-block;padding:8px 18px;border-radius:6px;background:#06c;color:#fff;text-decoration:none}</style>"
+        "<h2>保存结果</h2>"));
+    srv.sendContent(b);
+    if (g_cfg_valid)
+        srv.sendContent(PSTR("<div class=ok>✓ 配置已保存并下推时钟（亮度、闹钟等即时生效）。</div>"));
+    else
+        srv.sendContent(PSTR("<div class=warn>⚠ 时钟当前无应答，改动已暂存本机。请稍后刷新或重启时钟，使其重新同步本机配置。</div>"));
+    srv.sendContent(PSTR("<p><a class=btn href=/>返回设置</a></p>"));
 }
 
 /* ---- 倒计时页（Web 侧管理，驱动协议帧） ---- */
@@ -262,14 +312,19 @@ static void h_cd() {
     wifi_touch();   /* 真实 Web 请求才刷新闲置计时（看倒计时页） */
     srv.setContentLength(CONTENT_LENGTH_UNKNOWN);
     srv.send(200, HT, "");
-    srv.sendContent(PSTR("<meta charset=utf-8><title>倒计时</title><h2>倒计时</h2>"
-        "<form method=post action=/cdstart>时长："));
+    srv.sendContent(CSS_STA);
+    srv.sendContent(PSTR("<title>倒计时</title><h2>倒计时</h2>"
+        "<form method=post action=/cdstart>"
+        "<div class=row><div class=lbl>时长</div><div class=ctl>"));
     sel_num("min", store_get_cd_min(), 1, 99);
     srv.sendContent(" 分 ");
     sel_num("sec", store_get_cd_sec(), 0, 59);
-    srv.sendContent(" 秒<button style=margin-left:12px>开始</button></form>"
-        "<p><a href=/cdpause>暂停/继续</a> | <a href=/cdcancel>取消</a></p>"
-        "<p><a href=/>返回设置</a></p>");
+    srv.sendContent(" 秒</div></div>"
+        "<div class=foot><button type=submit>开始</button>"
+        " <a class=btn href=/cdpause>暂停/继续</a>"
+        " <a class=btn href=/cdcancel>取消</a></div></form>"
+        "<p class=hint>倒计时由时钟独立计时，到点会响铃提醒；「暂停/继续」可随时暂停恢复，「取消」立即停止。</p>"
+        "<p><a href=/>← 返回设置</a></p>");
 }
 
 static void h_cd_start() {
@@ -291,6 +346,7 @@ static void h_root() {
     if (wifi_ap_active()) {
         srv.setContentLength(CONTENT_LENGTH_UNKNOWN);
         srv.send(200, HT, "");
+        srv.sendContent(CSS_STA);
         srv.sendContent(PAGE_AP_FIRST);
         /* 有已存凭据却仍开 AP = 上次尝试连接失败（否则不会进 AP），据此提醒用户检查 */
         char ssid[33], pwd[65];
