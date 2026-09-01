@@ -33,7 +33,9 @@ bool store_get_wifi(char *ssid, size_t ss, char *pwd, size_t ps) {
     ssid[i] = 0;
     for (i = 0; i < ps - 1 && EEPROM.read(OFF_PWD + i); i++) pwd[i] = EEPROM.read(OFF_PWD + i);
     pwd[i] = 0;
-    return ssid[0] != 0;
+    /* 0xFF=擦除/部分损坏态（与 store_get_ap_pwd 同守卫）：MAGIC 残存但 SSID 区为擦除态时
+       不得当作有效 WiFi 读出，否则 WiFi.begin(垃圾) 永久连不上 */
+    return ssid[0] != 0 && ssid[0] != 0xFF;
 }
 
 static void write_str(size_t off, size_t cap, const char *s) {

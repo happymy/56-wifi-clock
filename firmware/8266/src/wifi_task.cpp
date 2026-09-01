@@ -110,7 +110,13 @@ static bool do_sync() {
     return true;
 }
 
-void wifi_force_sync() { do_sync(); }
+void wifi_force_sync() {
+    /* 配网态（ap_mode）不响应 REQ_TIME：do_sync 内部 WiFi.mode(WIFI_STA) 会关掉软 AP，
+       而 ap_mode 标志仍 true → 连 STA 失败后不重开 AP，wifi_loop:139 又永久 return，
+       设备陷入既不能配网也不能联网的卡死态。AP 态下忽略对时请求最干净。 */
+    if (ap_mode) return;
+    do_sync();
+}
 
 void wifi_setup() {
     pinMode(LED_WIFI, OUTPUT);
@@ -139,12 +145,23 @@ void wifi_loop() {
     if (ap_mode) return;                              /* AP 配网由 web 层 handleClient */
 
     if (!synced) {
-        /* NTP 失败时 do_sync 最长阻塞 ~35s（15s STA + 2×20s NTP），逐秒重试会占死主循环；
-           首次立即试，失败后每 SYNC_RETRY_MS 才重试 */
+        /* NTP 失败时 do_sync 最长阻塞 ~35s（15s STA + 2×20s NTP），逐秒重试会占死主循环。
+           只在 STA 未连接（伪待机断网态）才按 SYNC_RETRY_MS 节流重试唤醒：
+           若 STA 已连上（do_sync 返回 true、WL_CONNECTED）则应保持 RF 服务 Web 并走下方闲置
+           计时断回伪待机，而非每 60s forceSleepWake+重连——否则 do_sync:97 每次重置 last_rf_use，
+           且唤醒抢占 RF，置闲 5min 判定永不触发，NTP 失败时 STA 永在线（原始 bug 根因）。 */
         static unsigned long retry_at = 0;
-        if (retry_at == 0 || now - retry_at >= SYNC_RETRY_MS) {
+        if (retry_at == 0
+            || (WiFi.status() != WL_CONNECTED && now - retry_at >= SYNC_RETRY_MS)) {
             retry_at = now;
             do_sync();
+        }
+        /* 未同步但 STA 在线也按闲置断回伪待机（协议 §6 伪待机是常态）：与 synced 分支(§179)同逻辑，
+           Web 访问(web.cpp wifi_touch)刷新 last_rf_use 续期，无活动 5min 才断网休眠，
+           配置页在 NTP 失败期间仍可达、断网后由上方 retry 唤醒。 */
+        if ((WiFi.getMode() & WIFI_STA) && !ap_mode
+            && last_rf_use && (now - last_rf_use) >= IDLE_MS) {
+            WiFi.forceSleepBegin();
         }
         return;
     }

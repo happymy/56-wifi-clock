@@ -58,6 +58,7 @@ static const char PAGE_AP_OK[] PROGMEM =
     "用浏览器访问该地址即可打开设置页。</p>";
 
 static void h_ap_wifi() {
+    wifi_touch();   /* 真实 Web 请求才刷新闲置计时（配网提交） */
     if (!srv.hasArg("ssid") || srv.arg("ssid").length() == 0) { srv.send_P(404, HT, PSTR("<h2>404</h2>")); return; }
     store_save_wifi(srv.arg("ssid").c_str(), srv.arg("pwd").c_str());
     srv.send_P(200, HT, PAGE_AP_OK);
@@ -117,6 +118,7 @@ static unsigned bcd2dec(unsigned v) { return (v >> 4) * 10 + (v & 0x0F); }
 static unsigned dec2bcd(unsigned v) { return ((v / 10) << 4) | (v % 10); }
 
 static void h_sta_root() {
+    wifi_touch();   /* 真实 Web 请求才刷新闲置计时（看 STA 配置页） */
     /* chunked 流式响应的正确开场：必须先声明长度未定并发出 200 空串，
        否则 sendContent 只有正文、没有响应头（ESP8266WebServer-impl.h 要求） */
     srv.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -211,6 +213,7 @@ static long pg(const char *name, long dflt, long lo, long hi) {
 }
 
 static void h_sta_save() {
+    wifi_touch();   /* 真实 Web 请求才刷新闲置计时（保存配置） */
     g_cfg[0] = (uint8_t)pg("display_mode", g_cfg[0], 0, 1);
     g_cfg[1] = (uint8_t)pg("bright_mode", g_cfg[1], 0, 1);
     g_cfg[2] = (uint8_t)pg("bright_lvl", g_cfg[2], 1, 8);
@@ -256,6 +259,7 @@ static void h_sta_save() {
 
 /* ---- 倒计时页（Web 侧管理，驱动协议帧） ---- */
 static void h_cd() {
+    wifi_touch();   /* 真实 Web 请求才刷新闲置计时（看倒计时页） */
     srv.setContentLength(CONTENT_LENGTH_UNKNOWN);
     srv.send(200, HT, "");
     srv.sendContent(PSTR("<meta charset=utf-8><title>倒计时</title><h2>倒计时</h2>"
@@ -269,6 +273,7 @@ static void h_cd() {
 }
 
 static void h_cd_start() {
+    wifi_touch();   /* 真实 Web 请求才刷新闲置计时（启动倒计时） */
     long m = pg("min", 1, 1, 99);
     long s = pg("sec", 0, 0, 59);
     cd_set_preset((uint8_t)m, (uint8_t)s);
@@ -276,11 +281,12 @@ static void h_cd_start() {
     cd_start();
     srv.send_P(200, HT, PSTR("<meta charset=utf-8><title>OK</title><h2>倒计时已开始</h2><a href=/cd>返回</a>"));
 }
-static void h_cd_pause() { cd_pause_resume(); srv.sendHeader("Location", "/cd"); srv.send(302, HT, ""); }
-static void h_cd_cancel() { cd_cancel(); srv.sendHeader("Location", "/cd"); srv.send(302, HT, ""); }
+static void h_cd_pause() { wifi_touch(); cd_pause_resume(); srv.sendHeader("Location", "/cd"); srv.send(302, HT, ""); }
+static void h_cd_cancel() { wifi_touch(); cd_cancel(); srv.sendHeader("Location", "/cd"); srv.send(302, HT, ""); }
 
 /* 根页面：按当前模式分流——AP 配网页（仅 WiFi 账号） / STA 全功能页（两页分离铁律） */
 static void h_root() {
+    wifi_touch();   /* 真实 Web 请求才刷新闲置计时（看首页） */
     srv.sendHeader("Cache-Control", "no-store");   /* 配网页为动态内容，禁止浏览器缓存，防旧页/无列表 */
     if (wifi_ap_active()) {
         srv.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -334,8 +340,9 @@ void web_setup(bool ap) {
 
 void web_loop() {
     if (wifi_ap_active() || WiFi.isConnected()) {
-        wifi_touch();                                   /* 服务 Web=RF 活跃：刷新闲置计时，配置页长停留不被打断 */
-        srv.handleClient();
+        srv.handleClient();   /* 真正的用户请求在 handler 内 wifi_touch() 刷新闲置计时；
+                                 不在本处无条件 touch，否则每 loop 刷新 last_rf_use → 5min
+                                 闲置计时永不满足 → 8266 一直联网不进伪休眠 */
     }
     /* 伪待机（RF 关/未关联）时无网可服务；仅 STA 关联或 AP 开启时轮询 */
 }
