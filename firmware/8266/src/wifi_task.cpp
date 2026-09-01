@@ -53,12 +53,20 @@ static void push_set_time() {
     synced = true;
 }
 
-/* 开 AP 配网（真实模式无 STA 时） */
+/* 开 AP 配网（真实模式无 STA 时）。
+   用 WIFI_AP_STA 双模以便配网页可扫描周边网络（软 AP 固定信道 6，防 STA 扫描/连接
+   拖走射频导致客户端掉线，见 esp8266/Arduino#817：单独射频被拖走时 softAP 信道跟随）。
+   配网态不发起 STA 连接，故无非预期信道跳变。
+   STA 扫描前置（scanNetworks 官方示例要求 STA 已启用并断开，否则扫描不触发返回空/list）：
+   enableSTA(true)+disconnect() 确保 STA 接口就绪、处于未连接态，供配网页 h_root 扫描。 */
 static void open_ap() {
     ap_mode = true;
     digitalWrite(LED_WIFI, LOW);      /* 蓝/板载 LED 亮：配网模式指示（active-low） */
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(AP_SSID, store_get_ap_pwd());
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.enableSTA(true);             /* 显式启用 STA 接口（不关软 AP），扫描前置 */
+    WiFi.disconnect();                /* 确保处于未连接态，扫描才可触发（官方前置） */
+    delay(100);
+    WiFi.softAP(AP_SSID, store_get_ap_pwd(), 6);
 }
 
 /* 阻塞型流程：唤醒 RF → 连 STA → NTP 对时 → 推 SET_TIME → 保持 STA 服务 Web。

@@ -13,8 +13,23 @@ static ESP8266WebServer srv(80);
 
 /* ---- AP 配网页：只填 WiFi 账号（两页分离铁律） ---- */
 static const char PAGE_AP_FIRST[] PROGMEM =
-    "<meta charset=utf-8><title>56dz 时钟配网</title><style>"
+    "<meta charset=utf-8><title>56dz 时钟配网</title>"
+    "<meta name=viewport content='width=device-width,initial-scale=1'>"
+    "<style>"
+    "body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:420px;margin:24px auto;padding:0 16px;color:#222}"
+    "h2{font-size:20px;margin:8px 0 16px}"
+    "label{display:block;margin:14px 0 4px;font-size:14px;color:#444}"
+    "input{width:100%;box-sizing:border-box;padding:8px;font-size:15px;border:1px solid #bbb;border-radius:6px}"
+    "input:focus{outline:none;border-color:#06c;box-shadow:0 0 0 2px rgba(0,102,204,.15)}"
+    "button{padding:9px 22px;font-size:15px;border:none;border-radius:6px;cursor:pointer}"
+    "button[type=submit]{background:#06c;color:#fff;margin-right:8px}"
+    "button[type=button]{background:#eee;color:#333}"
     "b.fail{color:#c00}.hint{color:#666;font-size:13px}"
+    "#wlList{margin-top:6px;border:1px solid #e3e3e3;border-radius:6px;overflow:hidden}"
+    "#wlList .wi{padding:8px 10px;font-size:14px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:#fff;color:#222;text-decoration:none}"
+    "#wlList .wi:last-child{border-bottom:none}#wlList .wi:hover{background:#eef4ff}"
+    "#wlList .wi .bars{color:#06c;font-size:12px;letter-spacing:1px}"
+    ".empty{color:#888;font-size:14px;padding:10px;text-align:center}"
     "</style><h2>WiFi 时钟配网</h2>";
 
 static const char PAGE_AP_FAIL[] PROGMEM =
@@ -22,11 +37,16 @@ static const char PAGE_AP_FAIL[] PROGMEM =
     "<br>① WiFi 名称完全一致（区分大小写，且是 2.4GHz 网络）"
     "<br>② 密码正确（注意大小写与特殊字符）</p>";
 
-static const char PAGE_AP_FORM[] PROGMEM =
+static const char PAGE_AP_FORM_HEAD[] PROGMEM =
     "<form method=post action=/wifi>"
-    "WiFi 名称：<input name=ssid required autofocus><br>"
-    "WiFi 密码：<input name=pwd type=password><br>"
-    "<button>连接</button></form>"
+    "<label>WiFi 名称</label><input name=ssid required autofocus>"
+    "<div id=wlList>";
+
+static const char PAGE_AP_FORM_TAIL[] PROGMEM =
+    "</div>"
+    "<label>WiFi 密码</label><input name=pwd type=password><br><br>"
+    "<button type=submit>连接</button> <button type=button onclick=location.reload()>刷新列表</button></form>"
+    "<script>function setWifi(v){document.getElementsByName('ssid')[0].value=v;}</script>"
     "<p class=hint>只能连接 2.4GHz 网络。保存后本热点会关闭，时钟将在 30 秒内连接并对时；"
     "若连接失败，本热点会自动重新打开，请回此页重试。</p>";
 
@@ -261,6 +281,7 @@ static void h_cd_cancel() { cd_cancel(); srv.sendHeader("Location", "/cd"); srv.
 
 /* 根页面：按当前模式分流——AP 配网页（仅 WiFi 账号） / STA 全功能页（两页分离铁律） */
 static void h_root() {
+    srv.sendHeader("Cache-Control", "no-store");   /* 配网页为动态内容，禁止浏览器缓存，防旧页/无列表 */
     if (wifi_ap_active()) {
         srv.setContentLength(CONTENT_LENGTH_UNKNOWN);
         srv.send(200, HT, "");
@@ -269,7 +290,28 @@ static void h_root() {
         char ssid[33], pwd[65];
         if (store_get_wifi(ssid, sizeof(ssid), pwd, sizeof(pwd)))
             srv.sendContent(PAGE_AP_FAIL);
-        srv.sendContent(PAGE_AP_FORM);
+        srv.sendContent(PAGE_AP_FORM_HEAD);
+        /* 同步扫描周边网络，渲染可见可点的 WiFi 列表（点击填 SSID，也可手输）。
+           open_ap 已 enableSTA(true)+disconnect() 满足扫描前置。 */
+        int n = WiFi.scanNetworks(false, true);
+        if (n <= 0)
+            srv.sendContent(PSTR("<div class=empty>未扫描到附近 WiFi，请在上方手动输入。</div>"));
+        for (int i = 0; i < n; i++) {
+            String s = WiFi.SSID(i);
+            if (s.length() == 0 || s.indexOf('\'') != -1) continue;  /* 跳过空/含引号 SSID，防 HTML/JS 破坏 */
+            /* SSID 左对齐靠左、信号条靠右（flex space-between 见样式）；点击填入输入框 */
+            const char *bars = WiFi.RSSI(i) >= -60 ? "▂▄▆█"
+                            : WiFi.RSSI(i) >= -70 ? "▂▄▆ "
+                            : WiFi.RSSI(i) >= -80 ? "▂▄  "
+                            :                       "▂   ";
+            const char *note = (WiFi.encryptionType(i) == ENC_TYPE_NONE) ? "（开放）" : "";
+            char b[180];
+            snprintf_P(b, sizeof(b), PSTR("<a class=wi onclick=setWifi('%s')>%s%s<span class=bars>%s</span></a>"),
+                s.c_str(), s.c_str(), note, bars);
+            srv.sendContent(b);
+        }
+        WiFi.scanDelete();           /* 释放扫描结果内存 */
+        srv.sendContent(PAGE_AP_FORM_TAIL);
     } else {
         h_sta_root();
     }
