@@ -39,7 +39,8 @@ void cd_tick() {
     if (st == CD_RUN) {
         if (remain_s > 0) {
             remain_s--;
-            if (remain_s == 0) {               /* 归零：仅响铃。显示停留末帧 MM:SS，释放只靠取消→mode0（协议 §6.3/T11b） */
+            if (remain_s == 0) {               /* 归零：先推末帧 00:00（显示停在 0000 而非前帧 00:01），再响铃；释放只靠取消→mode0（协议 §6.3/T11b） */
+                send_disp_override(DO_MODE_CD, 0, 0);
                 send_disp_override(DO_MODE_RING, 0, 0);
                 st = CD_IDLE; ring_active = true;
             } else {
