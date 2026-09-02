@@ -6,6 +6,8 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
 
 static ESP8266WebServer srv(80);
 
@@ -94,6 +96,8 @@ static const char CSS_STA[] PROGMEM =
     ".foot{display:flex;align-items:center;margin-top:14px}"
     "input[type=text],input[type=password]{width:100%;box-sizing:border-box;padding:8px;font-size:15px;border:1px solid #bbb;border-radius:6px}"
     "input[type=text]:focus,input[type=password]:focus{outline:none;border-color:#06c;box-shadow:0 0 0 2px rgba(0,102,204,.15)}"
+    "input[type=number]{width:80px;box-sizing:border-box;padding:6px 8px;font-size:14px;border:1px solid #bbb;border-radius:6px;text-align:right}"
+    "input[type=number]:focus{outline:none;border-color:#06c;box-shadow:0 0 0 2px rgba(0,102,204,.15)}"
     "button[type=button]{background:#eee;color:#333}"
     "b.fail{color:#c00}"
     "#wlList{margin-top:6px;border:1px solid #e3e3e3;border-radius:6px;overflow:hidden}"
@@ -182,19 +186,16 @@ static void h_sta_root() {
     /* 温度 */
     section("温度");
     row("温度单位"); radio2("temp_unit", g_cfg[53], "摄氏 °C", "华氏 °F"); row_end();
-    row("温度补偿"); {
+    row("温度校准"); {
         char b[96];
-        /* 拆方向+数值两下拉，杜绝自由输入 */
-        long off = (signed char)g_cfg[3];
-        long dir = off < 0 ? 1 : 0;
-        long av = off < 0 ? -off : off;
-        snprintf_P(b, sizeof(b), PSTR("<select name=temp_offset_dir>"));
+        long offv = (signed char)g_cfg[3];
+        snprintf_P(b, sizeof(b), PSTR("当前补偿 %+ld°C"), offv);
         srv.sendContent(b);
-        snprintf_P(b, sizeof(b), dir == 0 ? PSTR("<option value=0 selected>偏低</option><option value=1>偏高</option>") : PSTR("<option value=0>偏低</option><option value=1 selected>偏高</option>"));
-        srv.sendContent(b);
-        srv.sendContent("</select>");
-        sel_num("temp_offset_v", av, 0, 99);
-        srv.sendContent(" 度");
+        srv.sendContent(PSTR("<br>输入单位 "));
+        radio2("cal_unit", g_cfg[53], "摄氏°C", "华氏°F");
+        srv.sendContent(PSTR("<br>时钟读数 <input type=number name=cal_disp step=0.1> °"
+                             " 实际温度 <input type=number name=cal_real step=0.1> °"));
+        srv.sendContent(PSTR("<span class=hint>先让时钟显示温度，抄下读数；填实际环境温度，保存自动补偿。</span>"));
     } row_end();
     section_end();
 
@@ -274,10 +275,22 @@ static void h_sta_save() {
     long sn = pg("snooze", g_cfg[19], 0, 10); g_cfg[19] = (uint8_t)((sn == 5 || sn == 10) ? sn : 0);
     g_cfg[20] = (uint8_t)(srv.hasArg("led_en") ? 1 : 0);
 
-    /* 温度补偿：方向(偏低/偏高) × 数值 0-99 → 有符号 */
-    long dir = pg("temp_offset_dir", 0, 0, 1);
-    long v = pg("temp_offset_v", 0, 0, 99);
-    g_cfg[3] = (uint8_t)(signed char)(dir ? -v : v);
+    /* 温度校准：读数与实际温度同单位(cal_unit)，统一转°C 后差取整为补偿 */
+    if (srv.hasArg("cal_unit") && srv.hasArg("cal_disp") && srv.hasArg("cal_real")) {
+        /* 信任边界：atof 可返回 HUGE_VAL/NaN（越界 double→long 为 UB），空串→0.0；
+           先判串非空 + 有限值 + 物理合理范围(±200°C) 再运算 */
+        const String &sd = srv.arg("cal_disp"), &sr = srv.arg("cal_real");
+        float d, r;
+        if (sd.length() > 0 && sr.length() > 0 &&
+            (d = atof(sd.c_str()), r = atof(sr.c_str()), isfinite(d) && isfinite(r)) &&
+            d <= 200.0f && d >= -200.0f && r <= 200.0f && r >= -200.0f) {
+            if (pg("cal_unit", g_cfg[53], 0, 1) == 1) { d = (d - 32.0f) * 5.0f / 9.0f; r = (r - 32.0f) * 5.0f / 9.0f; }
+            float diff = r - d;
+            long off = (long)(diff + (diff >= 0 ? 0.5f : -0.5f));   /* round 到整数°C */
+            if (off < -99) off = -99; else if (off > 99) off = 99;
+            g_cfg[3] = (uint8_t)(signed char)off;
+        }
+    }
 
     /* 闹钟：开关(独立 name) + 时/分下拉(十进制) → BCD 下发（§5 铁律） */
     for (int n = 0; n < 3; n++) {
