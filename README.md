@@ -57,7 +57,7 @@ doc/              数据手册 + 原版功能分析
   原版时钟功能.md                    原版（被复刻对象）功能分析
 plan/             设计文档（权威依据）
   原理图.md            引脚映射与器件连接（权威）
-  串口通信协议.md       51↔8266 串口协议帧格式（含 SET_CFG 54B 偏移）
+  串口通信协议.md       51↔8266 串口协议帧格式（含 SET_CFG 13B 偏移）
   固件复刻计划.md       复刻路线与里程碑（先复刻后扩展，v2 为权威）
   新版时钟功能.md        51 产品固件 v2 规格/容量取舍/温度补偿（权威）
   8266串口测试计划.md    串口联调测试计划 + 实测结果记录（§9）
@@ -67,7 +67,7 @@ firmware/         正式产品固件（按 MCU 分目录）
     src/              固件源码（见下方）
     test/             测试脚本（联调 + 离线逻辑，test/README.md 有明细）
        uart_8266_sim.py      主驱动：冒充 8266 联调（settime/setcfg/send/...）
-       com_cfg.py            回读 54B 配置并解码（闹钟时/分按 BCD 显示）
+       com_cfg.py            回读 13B 配置并解码（按 config.h 偏移）
        display_logic_test.py 离线验证 display.c 显示逻辑
        keys_fsm_test.py      离线验证按键 FSM
        ring_alarm_fsm_test.py 离线验证闹钟/响铃 FSM
@@ -83,7 +83,7 @@ firmware/         正式产品固件（按 MCU 分目录）
 | 文件 | 作用 |
 |---|---|
 | `main.c` | 主循环 + 串口协议解析（UART1/Timer2 波特源）+ 状态机/闹钟/倒计时接管 |
-| `config.c/.h` | 54B 配置结构（`SET_CFG` 布局）+ 默认值 |
+| `config.c/.h` | 13B 配置结构（`SET_CFG` 布局）+ 默认值 |
 | `display.c/.h` | TM1639 渲染 + 整屏三态（TIME/DATE/TEMP）+ SMG1/SMG2 映射 + °C/°F |
 | `ds1302.c/.h` | DS1302 实时时钟读写（BCD） |
 | `tm1639.c/.h` | TM1639 三线驱动 + 8 档亮度 + 段拆分/GRID3 倒装 |
@@ -116,7 +116,7 @@ STC 芯片靠串口下载，流程是“先点下载、再上电”：
 - ✅ **DS1302 实时时钟 + 断电能走时**（v0.5）：突发读判定 CH 位、上电首读加延时与重试（修复断电清零）、单字节写清 CH 保证连续走时；`ds1302.c/h` 已提交并烧录验证。
 - ✅ **传统手动设置**（v0.5，2026-08-31 更新字段序/星期约定）：SET 单击进入并循环切换字段（年→月→日→星期→时→分→秒，星期 0–6 以 0=周日且 SMG1 左显数值右管空），UP 在当前字段加值（独立回绕、闰年感知、月 12→1 不设 0），末字段 SET 保存+响蜂鸣。
 - ✅ **硬件 UART1 回环验证**（uart-loopback-v0.6 / v0.6）：STC15W408AS 无 Timer1，UART1 改用 Timer2 波特源（9600 8N1），自发自收比对，大屏左发/右收、SMG 显 0/E、串口打印 `TX=.. RX=.. OK/FAIL`。
-- ✅ **51 产品固件（firmware/STC，v1.0.5）**：完整按键语义（SET 单/双/长按、UP 单/双/长按进计时器、双键≥5s 重配网）、配置 54B EEPROM 持久化（IAP 0x0000–0x13FF）、SET_TIME/SET_CFG/NET_STAT/STA_IP/REQ_CFG/REQ_TIME/HEARTBEAT/ENTER_AP/CD_CTRL/DISP_OVERRIDE 协议收发、SMG1 温度/日期选显、闰年感知、大屏整屏自动轮播（`display_mode`）、红色状态灯使能（`led_en`）、倒计时显示接管（DISP_OVERRIDE 驱动）。CODE 余量极小（余量以 `firmware/STC/BUILD.md` 为准），改动前必读 `firmware/STC/BUILD.md`。
+- ✅ **51 产品固件（firmware/STC）**：完整按键语义（SET 单/双/长按、UP 单/双/长按进计时器、双键≥5s 重配网）、配置 13B EEPROM 持久化（IAP 0x0000–0x13FF）、SET_TIME/SET_CFG/NET_STAT/STA_IP/REQ_CFG/REQ_TIME/HEARTBEAT/ENTER_AP/CD_CTRL/DISP_OVERRIDE/RING 协议收发、SMG1 温度/日期选显、闰年感知、大屏整屏自动轮播（`display_mode`）、红色状态灯使能（`led_en`）、倒计时显示接管（DISP_OVERRIDE 驱动）。CODE 余量极小（余量以 `firmware/STC/BUILD.md` 为准），改动前必读 `firmware/STC/BUILD.md`。
 - ✅ **传感器热敏温度 + 单点补偿**（temp_offset 由 8266 下推）、EEPROM 持久化（IAP）、三组闹钟、状态指示灯重构、计时器（51 原生 MM:SS 封顶 99:59）——均已完成。
 - ✅ **51 固件研发结束（v1.0.7）**：功能与硬件实机测试全部完成——串口协议帧（SET_CFG/对时/自动轮显/闹钟贪睡/计时器/°F 换算/日期/温度）逐项实机验证通过；`temp_offset` 单位（整数°C）实测标定；`SET_CFG` 读回防清零修复。51 端开发**收尾结束**，后续仅有随 8266 联调的排障性微调，不再有新功能开发。CODE 8097/8192B（余 95B）。
 - ⚠️ **已裁撤 / 未移植功能（代码完成度见 `plan/新版时钟功能.md` §十九）**：整点报时（曾 100% 实现后移除）、事项提醒 rem1–5（0% 从未实现）、计时器「时」位（0%）、IP 4 段滚动（曾实现后简化为 P+末段）、极暗软件 PWM（仅 demo 验证，产品未移植）。

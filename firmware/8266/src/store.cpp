@@ -5,14 +5,15 @@
 #define EEP_SIZE  512
 #define MAGIC     0x5A
 
-/* 布局：magic(1) wifi_ssid(32) wifi_pwd(64) ap_pwd(16) cfg_blob(54) cd_min(1) cd_sec(1) */
+/* 布局：magic(1) wifi_ssid(32) wifi_pwd(64) ap_pwd(16) cfg_blob(13) alarm(9) cd_min(1) cd_sec(1) */
 #define OFF_MAGIC    0
 #define OFF_SSID     1
 #define OFF_PWD      33
 #define OFF_AP_PWD   97
 #define OFF_CFG      113
-#define OFF_CD_MIN   167
-#define OFF_CD_SEC   168
+#define OFF_ALARM    126     /* 3 组 × [on, hh_bcd, mm_bcd] */
+#define OFF_CD_MIN   135
+#define OFF_CD_SEC   136
 
 static void putc(size_t o, uint8_t v) { EEPROM.write(o, v); }
 
@@ -62,6 +63,19 @@ const char *store_get_ap_pwd() {
 }
 
 void store_save_cfg_blob() { for (int i = 0; i < CFG_LEN; i++) putc(OFF_CFG + i, g_cfg[i]); EEPROM.commit(); }
+
+/* 闹钟本地权威（决策⑨：3 组 × 时/分，响铃判定上移 8266）；hh/mm 为 BCD */
+void store_save_alarm(int n, uint8_t on, uint8_t hh_bcd, uint8_t mm_bcd) {
+    size_t o = OFF_ALARM + n * 3;
+    putc(o, on); putc(o + 1, hh_bcd); putc(o + 2, mm_bcd);
+    EEPROM.commit();
+}
+bool store_get_alarm(int n, uint8_t *hh_bcd, uint8_t *mm_bcd) {
+    size_t o = OFF_ALARM + n * 3;
+    uint8_t on = EEPROM.read(o);
+    if (on) { if (hh_bcd) *hh_bcd = EEPROM.read(o + 1); if (mm_bcd) *mm_bcd = EEPROM.read(o + 2); }
+    return on != 0;
+}
 
 void store_save_cd(uint8_t preset_min, uint8_t preset_sec) { putc(OFF_CD_MIN, preset_min ? preset_min : 5); putc(OFF_CD_SEC, preset_sec); EEPROM.commit(); }
 uint8_t store_get_cd_min() { uint8_t v = EEPROM.read(OFF_CD_MIN); return (v >= 1 && v <= 99) ? v : 5; }

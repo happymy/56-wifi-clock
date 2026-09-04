@@ -174,7 +174,7 @@ static void h_sta_root() {
     /* 显示 */
     section("显示");
     row("大屏显示"); radio2("display_mode", g_cfg[0], "固定时间", "自动轮换"); row_end();
-    row("下排小屏显示"); radio2("smg1_mode", g_cfg[21], "温度", "日期"); row_end();
+    row("下排小屏显示"); radio2("smg1_mode", g_cfg[11], "温度", "日期"); row_end();
     section_end();
 
     /* 亮度 */
@@ -185,33 +185,35 @@ static void h_sta_root() {
 
     /* 温度 */
     section("温度");
-    row("温度单位"); radio2("temp_unit", g_cfg[53], "摄氏 °C", "华氏 °F"); row_end();
+    row("温度单位"); radio2("temp_unit", g_cfg[12], "摄氏 °C", "华氏 °F"); row_end();
     row("温度校准"); {
         char b[96];
         long offv = (signed char)g_cfg[3];
         snprintf_P(b, sizeof(b), PSTR("当前补偿 %+ld°C"), offv);
         srv.sendContent(b);
         srv.sendContent(PSTR("<br>输入单位 "));
-        radio2("cal_unit", g_cfg[53], "摄氏°C", "华氏°F");
+        radio2("cal_unit", g_cfg[12], "摄氏°C", "华氏°F");
         srv.sendContent(PSTR("<br>时钟读数 <input type=number name=cal_disp step=0.1> °"
                              " 实际温度 <input type=number name=cal_real step=0.1> °"));
         srv.sendContent(PSTR("<span class=hint>先让时钟显示温度，抄下读数；填实际环境温度，保存自动补偿。</span>"));
     } row_end();
     section_end();
 
-    /* 闹钟 */
+    /* 闹钟（决策⑨：3 组 × 时/分，本地权威 8266 store） */
     section("闹钟");
     for (int n = 0; n < 3; n++) {
         char nm[16], b[64];
+        uint8_t hh_bcd = 0, mm_bcd = 0;
+        bool on = store_get_alarm(n, &hh_bcd, &mm_bcd);
         snprintf_P(b, sizeof(b), PSTR("闹钟%d%s"), n + 1, n == 0 ? "(主)" : n == 1 ? "(备用)" : "");
         row(b);
         snprintf_P(nm, sizeof(nm), PSTR("a%d_on"), n);
-        chk(nm, g_cfg[4 + n * 3] != 0, "");
+        chk(nm, on, "");
         snprintf_P(nm, sizeof(nm), PSTR("a%d_hh"), n);
-        sel_num(nm, bcd2dec(g_cfg[4 + n * 3 + 1]), 0, 23);
+        sel_num(nm, bcd2dec(hh_bcd), 0, 23);
         srv.sendContent(" 时 ");
         snprintf_P(nm, sizeof(nm), PSTR("a%d_mm"), n);
-        sel_num(nm, bcd2dec(g_cfg[4 + n * 3 + 2]), 0, 59);
+        sel_num(nm, bcd2dec(mm_bcd), 0, 59);
         srv.sendContent(" 分");
         row_end();
     }
@@ -227,7 +229,7 @@ static void h_sta_root() {
     section("其他");
     row("贪睡时长"); {
         char b[64];
-        long sn = g_cfg[19];
+        long sn = g_cfg[9];
         if (sn != 0 && sn != 5 && sn != 10) sn = 0;
         srv.sendContent("<select name=snooze>");
         snprintf_P(b, sizeof(b), sn == 0 ? PSTR("<option value=0 selected>关闭</option>") : PSTR("<option value=0>关闭</option>"));
@@ -238,11 +240,11 @@ static void h_sta_root() {
         srv.sendContent(b);
         srv.sendContent("</select>");
     } row_end();
-    row("状态灯(红色)"); chk("led_en", g_cfg[20] != 0, "亮灯(联网时)"); row_end();
+    row("状态灯(红色)"); chk("led_en", g_cfg[10] != 0, "亮灯(联网时)"); row_end();
 
     /* 关屏时段：启用开关 + 起止时/分分组 */
     {
-        unsigned sh = g_cfg[14], sm = g_cfg[15], eh = g_cfg[16], em = g_cfg[17];
+        unsigned sh = g_cfg[5], sm = g_cfg[6], eh = g_cfg[7], em = g_cfg[8];
         bool en = (sh != 0xFF && eh != 0xFF);
         row("关屏时段"); chk("off_enable", en, "启用 (到点熄灭大屏)"); row_end();
         row("  开始"); sel_num("off_s", sh == 0xFF ? 0 : sh, 0, 23); srv.sendContent(" 时 ");
@@ -269,11 +271,11 @@ static void h_sta_save() {
     g_cfg[0] = (uint8_t)pg("display_mode", g_cfg[0], 0, 1);
     g_cfg[1] = (uint8_t)pg("bright_mode", g_cfg[1], 0, 1);
     g_cfg[2] = (uint8_t)pg("bright_lvl", g_cfg[2], 1, 8);
-    g_cfg[53] = (uint8_t)pg("temp_unit", g_cfg[53], 0, 1);
-    g_cfg[21] = (uint8_t)pg("smg1_mode", g_cfg[21], 0, 1);
-    g_cfg[13] = (uint8_t)(signed char)pg("tz", wifi_tz_h(), -12, 14);   /* §5 偏移13：有符号时区 */
-    long sn = pg("snooze", g_cfg[19], 0, 10); g_cfg[19] = (uint8_t)((sn == 5 || sn == 10) ? sn : 0);
-    g_cfg[20] = (uint8_t)(srv.hasArg("led_en") ? 1 : 0);
+    g_cfg[12] = (uint8_t)pg("temp_unit", g_cfg[12], 0, 1);
+    g_cfg[11] = (uint8_t)pg("smg1_mode", g_cfg[11], 0, 1);
+    g_cfg[4] = (uint8_t)(signed char)pg("tz", wifi_tz_h(), -12, 14);   /* §5 偏移4：有符号时区 */
+    long sn = pg("snooze", g_cfg[9], 0, 10); g_cfg[9] = (uint8_t)((sn == 5 || sn == 10) ? sn : 0);
+    g_cfg[10] = (uint8_t)(srv.hasArg("led_en") ? 1 : 0);
 
     /* 温度校准：读数与实际温度同单位(cal_unit)，统一转°C 后差取整为补偿 */
     if (srv.hasArg("cal_unit") && srv.hasArg("cal_disp") && srv.hasArg("cal_real")) {
@@ -284,7 +286,7 @@ static void h_sta_save() {
         if (sd.length() > 0 && sr.length() > 0 &&
             (d = atof(sd.c_str()), r = atof(sr.c_str()), isfinite(d) && isfinite(r)) &&
             d <= 200.0f && d >= -200.0f && r <= 200.0f && r >= -200.0f) {
-            if (pg("cal_unit", g_cfg[53], 0, 1) == 1) { d = (d - 32.0f) * 5.0f / 9.0f; r = (r - 32.0f) * 5.0f / 9.0f; }
+            if (pg("cal_unit", g_cfg[12], 0, 1) == 1) { d = (d - 32.0f) * 5.0f / 9.0f; r = (r - 32.0f) * 5.0f / 9.0f; }
             float diff = r - d;
             long off = (long)(diff + (diff >= 0 ? 0.5f : -0.5f));   /* round 到整数°C */
             if (off < -99) off = -99; else if (off > 99) off = 99;
@@ -292,31 +294,32 @@ static void h_sta_save() {
         }
     }
 
-    /* 闹钟：开关(独立 name) + 时/分下拉(十进制) → BCD 下发（§5 铁律） */
+    /* 闹钟（决策⑨：本地 8266 store，BCD 存；§5 铁律 BCD 直存） */
     for (int n = 0; n < 3; n++) {
         char nm[16];
+        uint8_t hh_bcd = 0, mm_bcd = 0;
+        store_get_alarm(n, &hh_bcd, &mm_bcd);   /* 保底: 未保存过的组回填现值 */
         snprintf_P(nm, sizeof(nm), PSTR("a%d_on"), n);
-        g_cfg[4 + n * 3] = (uint8_t)(srv.hasArg(nm) ? 1 : 0);
+        uint8_t on = (uint8_t)(srv.hasArg(nm) ? 1 : 0);
         snprintf_P(nm, sizeof(nm), PSTR("a%d_hh"), n);
-        long hh = pg(nm, bcd2dec(g_cfg[4 + n * 3 + 1]), 0, 23);
+        long hh = pg(nm, bcd2dec(hh_bcd), 0, 23);
         snprintf_P(nm, sizeof(nm), PSTR("a%d_mm"), n);
-        long mm = pg(nm, bcd2dec(g_cfg[4 + n * 3 + 2]), 0, 59);
-        g_cfg[4 + n * 3 + 1] = (uint8_t)dec2bcd(hh);
-        g_cfg[4 + n * 3 + 2] = (uint8_t)dec2bcd(mm);
+        long mm = pg(nm, bcd2dec(mm_bcd), 0, 59);
+        store_save_alarm(n, on, (uint8_t)dec2bcd(hh), (uint8_t)dec2bcd(mm));
     }
 
     /* 关屏时段：开=用下拉值；关=0xFF 禁用 */
     if (srv.hasArg("off_enable")) {
-        g_cfg[14] = (uint8_t)pg("off_s", 0, 0, 23);
-        g_cfg[15] = (uint8_t)pg("off_sm", 0, 0, 59);
-        g_cfg[16] = (uint8_t)pg("off_e", 0, 0, 23);
-        g_cfg[17] = (uint8_t)pg("off_em", 0, 0, 59);
+        g_cfg[5] = (uint8_t)pg("off_s", 0, 0, 23);
+        g_cfg[6] = (uint8_t)pg("off_sm", 0, 0, 59);
+        g_cfg[7] = (uint8_t)pg("off_e", 0, 0, 23);
+        g_cfg[8] = (uint8_t)pg("off_em", 0, 0, 59);
     } else {
-        g_cfg[14] = g_cfg[15] = g_cfg[16] = g_cfg[17] = 0xFF;
+        g_cfg[5] = g_cfg[6] = g_cfg[7] = g_cfg[8] = 0xFF;
     }
 
     if (g_cfg_valid) {
-        send_set_cfg();               /* 完整 54B 下发（整帧覆盖，铁律） */
+        send_set_cfg();               /* 完整 13B 下发（整帧覆盖，铁律） */
         store_save_cfg_blob();
     }
     char b[96];

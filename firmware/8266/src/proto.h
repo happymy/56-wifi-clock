@@ -5,7 +5,7 @@
 
 #include <Arduino.h>
 
-#define CFG_LEN 54
+#define CFG_LEN 13
 
 /* 命令码（与 51 main.c 一致） */
 #define CMD_REQ_TIME  0x01
@@ -19,6 +19,7 @@
 #define CMD_REQ_CFG   0x87
 #define CMD_STA_IP    0x88
 #define CMD_DISP_OVERRIDE 0x89
+#define CMD_RING      0x8A   /* ESP→MCU: 响铃触发(mode1=报时短滴, 2/3=提醒/闹钟长鸣, 0=取消) */
 #define CMD_BOOT      0x8F
 
 /* DISP_OVERRIDE mode */
@@ -49,8 +50,9 @@ void proto_send_null(uint8_t cmd);
 
 /* 常用上行封装 */
 void send_set_time(const uint8_t *bcd8);      /* 8B 已含 BCD 换算 */
-void send_set_cfg();                          /* 整帧 54B 下发 g_cfg */
+void send_set_cfg();                          /* 整帧 13B 下发 g_cfg */
 void send_disp_override(uint8_t mode, uint8_t mm, uint8_t ss);
+void send_ring(uint8_t mode);                 /* RING 触发(mode: 1 报时, 2/3 提醒/闹钟, 0 停) */
 void send_net_stat(uint8_t st);
 void send_sta_ip(uint32_t ip);
 void send_ap_ready();

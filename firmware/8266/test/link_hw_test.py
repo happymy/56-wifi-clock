@@ -22,7 +22,7 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "STC", "test"))
 from uart_8266_sim import encode, Parser, fmt_frame, open_port, NAME  # noqa: E402
 
-CFG_LEN = 54
+CFG_LEN = 13
 DO_MODE_FREE, DO_MODE_CD, DO_MODE_RING = 0x00, 0x01, 0x02
 
 fails = []
@@ -114,12 +114,12 @@ def main():
     else:
         print("  ..  设备已有有效镜像（无 REQ_CFG，稳态正确）")
 
-    # S4 应答 SET_CFG(0x82,54B) 完整镜像 → g_cfg_valid=true → REQ_CFG 停止（刷新镜像同时验证无拉取）
+    # S4 应答 SET_CFG(0x82,13B) 完整镜像 → g_cfg_valid=true → REQ_CFG 停止（刷新镜像同时验证无拉取）
     print("[S4] SET_CFG 应答 → REQ_CFG 停止")
     cfg = bytearray(CFG_LEN)
-    cfg[13] = 8          # tz 偏移13 = 8（后续 SET_TIME 复用断言）
-    cfg[20] = 1          # led_en
-    cfg[21] = 0          # smg1_mode
+    cfg[4] = 8           # tz 偏移4 = 8（后续 SET_TIME 复用断言）
+    cfg[10] = 1          # led_en
+    cfg[11] = 0          # smg1_mode
     cfg[0] = 0           # display_mode 固定不动
     ser.write(encode(0x82, bytes(cfg)))
     f3 = collect(ser, 6.5)
@@ -173,7 +173,7 @@ def main():
     check("半帧冲掉后正常帧仍回 mode0", p == bytes([DO_MODE_FREE]),
           f"{fmt_frame(cmd, p)}")
 
-    # S10 REQ_TIME → do_sync（最长阻塞 ~35s）：连上外网则 SET_TIME(0x81) 8B 且 tz=g_cfg[13]；
+    # S10 REQ_TIME → do_sync（最长阻塞 ~35s）：连上外网则 SET_TIME(0x81) 8B 且 tz=g_cfg[4]；
     #    网络不可达时 STA 超时后不开网、也不回 SET_TIME（受控软失败，不判 FAIL）
     print("[S10] REQ_TIME → 触发对时 → SET_TIME")
     ser.write(encode(0x01))
@@ -181,7 +181,7 @@ def main():
         cmd, p = expect_frame_after(ser, 45, lambda c, _: c == 0x81, prewait=0)
         check("回 SET_TIME len=8", len(p) == 8, f"{fmt_frame(cmd, p)}")
         if len(p) == 8:
-            check("tz 字节 = 镜像 g_cfg[13]=8", p[7] == 8, f"tz={p[7]}")
+            check("tz 字节 = 镜像 g_cfg[4]=8", p[7] == 8, f"tz={p[7]}")
     except TimeoutError:
         note = "未回 SET_TIME（STA/NTP 不可达属受控软失败，非缺陷）"
         print(f"  ..  {note}")

@@ -5,7 +5,7 @@
   1. 协议帧编解码（AA 55 CMD LEN PAYLOAD CHK，CHK=XOR）  —— 对应 src/proto.cpp
   2. 倒计时状态机 tick/暂停/取消帧序列                    —— 对应 src/countdown.cpp
   3. BCD / 十进制换算（闹钟字段铁律）                     —— 对应 web.cpp 换算
-  4. SET_CFG 完整性铁律：改单字节仍整帧 54B 下发          —— 对应 web.cpp h_sta_save
+  4. SET_CFG 完整性铁律：改单字节仍整帧 13B 下发          —— 对应 web.cpp h_sta_save
   5. proto_rx 收帧状态机逐字节镜像：空帧/坏校验/超长帧/连续帧 —— 对应 src/proto.cpp
 
 用法：python test_proto.py
@@ -16,7 +16,7 @@ import sys
 SYNC0, SYNC1 = 0xAA, 0x55
 CMD_HEARTBEAT = 0x02
 CMD_SET_TIME, CMD_SET_CFG, CMD_NET_STAT, CMD_DISP_OVERRIDE, CMD_BOOT = 0x81, 0x82, 0x83, 0x89, 0x8F
-CFG_LEN = 54
+CFG_LEN = 13
 DO_MODE_FREE, DO_MODE_CD, DO_MODE_RING = 0x00, 0x01, 0x02
 
 
@@ -111,7 +111,7 @@ def test_frame_io():
     print("[帧编解码]")
     for cmd, payload, name in [
         (CMD_SET_TIME, bytes([0x26, 0x08, 0x30, 0x07, 0x09, 0x15, 0x30, 0x08]), "SET_TIME 8B"),
-        (CMD_SET_CFG, bytes(range(CFG_LEN)), "SET_CFG 54B"),
+        (CMD_SET_CFG, bytes(range(CFG_LEN)), "SET_CFG 13B"),
         (CMD_NET_STAT, bytes([3]), "NET_STAT"),
         (CMD_DISP_OVERRIDE, bytes([DO_MODE_CD, 4, 59]), "DISPLAY mode1"),
         (CMD_DISP_OVERRIDE, bytes([DO_MODE_RING]), "DISPLAY mode2"),
@@ -186,15 +186,15 @@ def test_bcd():
 
 
 def test_cfg_mirror():
-    print("[SET_CFG 完整性（整帧 54B 下发）]")
+    print("[SET_CFG 完整性（整帧 13B 下发）]")
     cfg = bytearray(range(CFG_LEN))
-    # 改一个字段（web save 模拟：改 off_s=offset14）
-    cfg[14] = 22
+    # 改一个字段（web save 模拟：关屏 start 时 in cfg[5]）
+    cfg[5] = 22
     out = encode(CMD_SET_CFG, bytes(cfg))
     cmd, payload = decode_frame(out)
-    check("整帧 54B", len(payload) == CFG_LEN)
-    check("改后帧仍携全量", payload[14] == 22 and payload[13] == 13)
-    check("未改字节保留", payload[0] == 0 and payload[53] == 53)
+    check("整帧 13B", len(payload) == CFG_LEN)
+    check("改后帧仍携全量", payload[5] == 22 and payload[4] == 4)
+    check("未改字节保留", payload[0] == 0 and payload[12] == 12)
 
 
 def test_proto_rx_sm():

@@ -130,6 +130,7 @@ static int ntc_temp_x10(unsigned int raw) {
 #define CMD_BOOT      0x8F
 #define CMD_CD_CTRL        0x05   /* MCU→ESP: 倒计时控制(0=暂停/恢复,1=取消) */
 #define CMD_DISP_OVERRIDE  0x89   /* ESP→MCU: 覆盖显示(倒计时/响铃) */
+#define CMD_RING           0x8A   /* ESP→MCU: 响铃触发(mode1=报时短滴, 2/3=提醒/闹钟长鸣, 0=取消) */
 
 static void uart_init(void) {
     SCON = 0x50;                 /* 8N1, REN=1（复用 demo/ds1302-clock 验证配置） */
@@ -177,8 +178,8 @@ unsigned char clock_ok = 1;               /* 1=DS1302 走时有效(CH=0) */
 /* 8266 倒计时显示接管：DISP_OVERRIDE 帧写入, main 渲染/按键读取 */
 static __xdata unsigned char cd_disp = 0;          /* 1=大屏显示 8266 倒计时 */
 static __xdata unsigned char cd_mm = 0, cd_ss = 0; /* 8266 推来的剩余 MM:SS */
-static __xdata unsigned char ring_alarm;            /* 0=静音, 1..3 闹钟响铃, 4=倒计时归零响铃(启动清XISEG) */
-static __xdata unsigned int  ring_ticks;             /* 当前响铃剩余 250ms 拍 */
+static __xdata unsigned char ring_alarm;            /* 0=静音; 4=倒计时归零长鸣; 5=闹钟/提醒长鸣(贪睡重生源, 避开1-3旧值) */
+static __xdata unsigned int  ring_ticks;             /* 当前响铃剩余拍(外循环240ms/拍, 240拍≈58s) */
 
 static void apply_set_time(__xdata unsigned char *p) {
     tscr.year = p[0]; tscr.month = p[1]; tscr.date = p[2]; tscr.weekday = p[3];
@@ -190,17 +191,24 @@ static void apply_set_time(__xdata unsigned char *p) {
 static void apply_set_cfg(__xdata unsigned char *p) {
     __xdata unsigned char *d = (__xdata unsigned char *)&cfg;
     unsigned char i;
-    for (i = 0; i < 54; i++) d[i] = p[i];   /* __xdata↔__xdata, 避开通用指针库 */
+    for (i = 0; i < sizeof(cfg_t); i++) d[i] = p[i];   /* __xdata↔__xdata, 避开通用指针库 */
     cfg_save();                              /* M11: 落盘(扇区0) */
 }
 static void uart_dispatch(unsigned char cmd, __xdata unsigned char *p, unsigned char len) {
     switch (cmd) {
         case CMD_BOOT:     esp_online = 1; break;   /* 握手: 此后才接受 8266 下行帧 */
         case CMD_SET_TIME: if (esp_online && len >= 8) apply_set_time(p); break;
-        case CMD_SET_CFG:  if (esp_online && len >= 54) apply_set_cfg(p); break;
+        case CMD_SET_CFG:  if (esp_online && len >= sizeof(cfg_t)) apply_set_cfg(p); break;
         case CMD_NET_STAT: if (esp_online && len >= 1) net_status = p[0]; break;
         case CMD_STA_IP:   if (esp_online && len >= 4) sta_ip_last = p[3]; break;
-        case CMD_REQ_CFG:  if (esp_online) uart_send_frame(CMD_SET_CFG, (__xdata unsigned char *)&cfg, 54); break;
+        case CMD_REQ_CFG:  if (esp_online) uart_send_frame(CMD_SET_CFG, (__xdata unsigned char *)&cfg, sizeof(cfg_t)); break;
+        case CMD_RING:     /* 8266 判响铃触发(mode1 报时短滴, 2/3 提醒/闹钟长鸣, 0 取消) */
+            if (esp_online && len >= 1) {
+                if (p[0] == 1) { beep_once(); }
+                else if (p[0] == 2 || p[0] == 3) { ring_alarm = 5; ring_ticks = 240; }  /* 长鸣: 复用闹钟机制(可SET停/UP贪睡), 非阻塞 */
+                else { ring_alarm = 0; ring_ticks = 0; }
+            }
+            break;
         case CMD_DISP_OVERRIDE:  /* 8266 倒计时显示接管 */
             if (esp_online && len >= 1) {
                 if (p[0] == 0) cd_disp = 0;
@@ -389,18 +397,11 @@ void main(void) {
                 : ((t.hr > sh || (t.hr == sh && t.min >= sm)) || (t.hr < eh || (t.hr == eh && t.min < em))));
 
 
-        /* 分钟变化：整点报时 + 闹钟匹配(到点即接管蜂鸣, 保证0秒触发) */
+        /* 分钟变化：整点报时 + 闹钟匹配 已上移 8266（响铃重构: 51 收 RING 触发, 此处不再比对）；
+           整屏主模式轮换仍留 51(离网自治, 决策保留) */
         if (t.min != last_min) {
             last_min = t.min;
             if (cfg.display_mode == 1) mode = (mode < DISP_TEMP) ? (mode + 1) : DISP_TIME;  /* 8266 控制: 每分钟轮换整屏主模式 */
-            {
-                unsigned char a;
-                for (a = 0; a < 3; a++) {
-                    if (cfg.alarm[a][0] && cfg.alarm[a][1] == t.hr && cfg.alarm[a][2] == t.min) {
-                        ring_alarm = (unsigned char)(a + 1); ring_ticks = 240; break;
-                    }
-                }
-            }
         }
         /* 响铃相位：500ms 响 / 500ms 静；贪睡倒计时到点重响 */
         if (ring_alarm) {

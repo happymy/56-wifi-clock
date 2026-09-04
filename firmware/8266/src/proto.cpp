@@ -57,3 +57,8 @@ void send_disp_override(uint8_t mode, uint8_t mm, uint8_t ss) {
     if (mode == DO_MODE_CD)   { b[0] = DO_MODE_CD; b[1] = mm; b[2] = ss; proto_send(CMD_DISP_OVERRIDE, b, 3); return; }
     b[0] = DO_MODE_RING; proto_send(CMD_DISP_OVERRIDE, b, 1);
 }
+
+void send_ring(uint8_t mode) {
+    uint8_t b = mode;
+    proto_send(CMD_RING, &b, 1);
+}

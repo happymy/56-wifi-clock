@@ -27,7 +27,7 @@ int wifi_tz_h() {
        覆盖 8266 重启后 store_load 已恢复但 REQ_CFG 未回的时刻，避免把 51 已设 tz 覆盖回默认 8）；
        二者皆无才回默认 +8，防未初始化全 0 误判 tz=0。 */
     if (!g_cfg_valid && !store_has_cfg()) return 8;
-    int8_t v = (int8_t)g_cfg[13];            /* §5 偏移13：tz 有符号原生（非 BCD） */
+    int8_t v = (int8_t)g_cfg[4];            /* §5 偏移4：tz 有符号原生（非 BCD） */
     return (v >= -12 && v <= 14) ? v : 8;
 }
 

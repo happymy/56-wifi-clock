@@ -5,6 +5,7 @@
 #include "web.h"
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include <time.h>
 
 volatile bool s51_alive;   /* 收到 51 任意上行帧 → 确认在线（REQ_CFG 拉配置的前提） */
 
@@ -56,6 +57,29 @@ proto_send_null(CMD_BOOT);     /* 首帧立即发：51 握手窗口≈5s（boot_
 
 static unsigned long last_boot, last_pull, last_tick;
 
+/* 闹钟判定（决策⑨ 上移 8266）：以 NTP 本地钟（已随 SET_TIME 校准 51 DS1302，断网照走）判定，
+   到点发 RING(3)。ponytail: 免 REQ_TIME_RD 往返，用已对时的本地钟即满足"以 DS1302 为准"；
+   未知年份=未对时/无网，不判。分钟粒度, 静态 last 防同分钟重触发。 */
+static unsigned last_alarm_key = 0xFFFFFFFF;
+static void alarm_check() {
+    time_t now = time(nullptr);
+    struct tm t;
+    localtime_r(&now, &t);
+    if (t.tm_year < (2016 - 1900)) return;
+    unsigned key = (unsigned)(t.tm_hour * 60 + t.tm_min);
+    if (key == last_alarm_key) return;
+    last_alarm_key = key;
+    for (int n = 0; n < 3; n++) {
+        uint8_t hh, mm;
+        if (store_get_alarm(n, &hh, &mm) &&
+            ((hh >> 4) * 10 + (hh & 0x0F)) == t.tm_hour &&
+            ((mm >> 4) * 10 + (mm & 0x0F)) == t.tm_min) {
+            send_ring(3);
+            break;
+        }
+    }
+}
+
 void loop() {
     /* 1) UART 逐字节喂协议机（9600 下每字节 ~1ms，轮询足够） */
     while (Serial.available()) proto_rx((uint8_t)Serial.read());
@@ -80,6 +104,7 @@ void loop() {
         last_tick = millis();
         cd_tick();
         wifi_loop();
+        alarm_check();
     }
 
     /* 5) Web（RF 工作时段服务，伪待机时 WiFi 已断自然无请求） */

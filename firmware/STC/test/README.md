@@ -4,8 +4,8 @@
 
 | 文件 | 作用 |
 |---|---|
-| `uart_8266_sim.py` | **主驱动脚本**，冒充 ESP8266 走 `micro_uart` 串口（默认 COM3 @ 9600 8N1）。子命令：`monitor`（监听）、`server`（冒充 ESP 自动握手应答）、`boot`、`send`（任意帧）、`settime`（对时）、`setcfg`（54B 配置）、`staip`、`cd`/`cdctrl`（倒计时显示接管）。详见各子命令 `-h`。 |
-| `com_cfg.py` | 回读 54B 配置并解码打印：连上即发 `BOOT(0x8F)`+`REQ_CFG(0x87)`，按 `config.h` 偏移解码（闹钟时/分按 BCD 显示）。 |
+| `uart_8266_sim.py` | **主驱动脚本**，冒充 ESP8266 走 `micro_uart` 串口（默认 COM3 @ 9600 8N1）。子命令：`monitor`（监听）、`server`（冒充 ESP 自动握手应答）、`boot`、`send`（任意帧）、`settime`（对时）、`setcfg`（13B 配置）、`staip`、`cd`/`cdctrl`（倒计时显示接管）。详见各子命令 `-h`。 |
+| `com_cfg.py` | 回读 13B 配置并解码打印：连上即发 `BOOT(0x8F)`+`REQ_CFG(0x87)`，按 `config.h` 偏移解码。 |
 
 ## 离线逻辑测试（不连硬件，验证固件状态机）
 

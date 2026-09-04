@@ -77,7 +77,7 @@ def bcd(n):
 def now_set_time_payload(tz=8):
     import datetime
     t = datetime.datetime.now()
-    wd = (t.isoweekday() % 7) + 1  # DS1302: 1=周日..7=周六
+    wd = (t.isoweekday() % 7)  # DS1302 铁律: 0=周日..6=周六 (isoweekday: 1=周一..7=周日)
     return bytes([bcd(t.year % 100), bcd(t.month), bcd(t.day), bcd(wd),
                    bcd(t.hour), bcd(t.minute), bcd(t.second), tz & 0xFF])
 
@@ -142,7 +142,7 @@ def fmt_frame(cmd, payload):
 class Sim:
     def __init__(self, port, baud=BAUD):
         self.ser = open_port(port, baud)
-        self.our_cfg = bytearray(54)     # 我们下发给 51 的 SET_CFG（用于回读）
+        self.our_cfg = bytearray(13)     # 我们下发给 51 的 SET_CFG（用于回读）
         self.our_cfg[20] = 1             # led_en 默认开(偏移20)
         self.echo_cfg = None            # 51 回的 SET_CFG（REQ_CFG 应答）
         self.stop = threading.Event()
@@ -241,7 +241,7 @@ def cmd_settime(args):
     h, m, s = args.time.split(":")
     import datetime
     t = datetime.datetime.now()
-    wd = (t.isoweekday() % 7) + 1
+    wd = (t.isoweekday() % 7)  # 0=周日..6=周六
     payload = bytes([bcd(t.year % 100), bcd(t.month), bcd(t.day), bcd(wd),
                      bcd(h), bcd(m), bcd(s), args.tz & 0xFF])
     sim.send(CMD_SET_TIME, payload)
@@ -254,15 +254,15 @@ def cmd_setcfg(args):
     if args.file:
         # 显式文件：以文件字节为底（完整覆盖，恰如真实 8266 下发快照）
         with open(args.file, "rb") as f:
-            data = bytearray(f.read(54))
-        if len(data) < 54:
-            data = data + bytes(54 - len(data))
+            data = bytearray(f.read(13))
+        if len(data) < 13:
+            data = data + bytes(13 - len(data))
     else:
         # 仅字段模式：先 REQ_CFG 读回 51 当前配置作底，只覆盖命令行字段，
         # 不破坏亮度等按键值（对齐真实 8266 的行为，避免全 0 清零）。
         sim.send(CMD_REQ_CFG)
         time.sleep(0.3)
-        if sim.echo_cfg is not None and len(sim.echo_cfg) == 54:
+        if sim.echo_cfg is not None and len(sim.echo_cfg) == 13:
             data = bytearray(sim.echo_cfg)
             print("  (基于 51 当前配置保留其它字节)")
         else:
@@ -342,9 +342,9 @@ def main():
     p.add_argument("port"); p.add_argument("time", help="HH:MM:SS")
     p.add_argument("--tz", type=int, default=8); p.set_defaults(func=cmd_settime)
 
-    p = sub.add_parser("setcfg", help="发送 SET_CFG(0x82) 54 字节配置")
+    p = sub.add_parser("setcfg", help="发送 SET_CFG(0x82) 13 字节配置")
     p.add_argument("port"); p.add_argument("file", nargs="?",
-                   help="可选 .bin 配置文件（不足 54B 补零）")
+                   help="可选 .bin 配置文件（不足 13B 补零）")
     p.add_argument("--smg1", type=int, choices=[0, 1],
                    help="smg1_mode @ 偏移21：0=温度 1=日期")
     p.add_argument("--temp-unit", dest="temp_unit", type=int, choices=[0, 1],

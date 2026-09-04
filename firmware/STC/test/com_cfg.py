@@ -48,28 +48,23 @@ ser.close()
 for cmd, pl in frames:
     print(f"RX cmd=0x{cmd:02X} len={len(pl)} : {pl.hex(' ')}")
 
-# 解码 cfg (54B) 按 config.h 布局
+# 解码 cfg (13B) 按 config.h 布局
 for cmd, pl in frames:
-    if cmd == 0x82 and len(pl) == 54:
+    if cmd == 0x82 and len(pl) == 13:
         d = pl
         def u(o): return d[o]
-        def s(o): return d[o] - 256 if d[o] & 0x80 else d[o]
-        def bcd(o): return ((u(o) >> 4) * 10) + (u(o) & 0x0F)   # 闹钟时/分为 BCD 存储 → 转十进制显示
+        def s(o): return d[o] - 256 if d[o] & 0x80 else d[o]   # 有符号 (tz/temp_offset)
         print("--- decoded cfg ---")
         print("display_mode =", u(0))
         print("bright_mode  =", u(1), "(0=auto/1=manual)")
         print("bright_lvl   =", u(2), "(1-8)")
         print("temp_offset  =", s(3))
-        for a in range(3):
-            base = 4 + a*3
-            print(f"alarm[{a}]      = on={u(base)} {bcd(base+1):02d}:{bcd(base+2):02d}")
-        print("tz           =", s(13))
-        print("off_start    =", u(14), u(15))
-        print("off_end      =", u(16), u(17))
-        print("chime        =", u(18))
-        print("snooze       =", u(19))
-        print("led_en       =", u(20), "(1=开红灯 0=关)")
-        print("smg1_mode     =", "温度" if u(21)==0 else "日期")
-        print("cd_preset    =", u(52))
-        print("temp_unit    =", u(53), "(0=C/1=F)")
+        print("tz           =", s(4))
+        print("off_start    =", u(5), u(6))
+        print("off_end      =", u(7), u(8))
+        print("snooze       =", u(9))
+        print("led_en       =", u(10), "(1=开红灯 0=关)")
+        print("smg1_mode     =", "温度" if u(11)==0 else "日期")
+        print("temp_unit    =", u(12), "(0=C/1=F)")
+        print("(闹钟/报时/倒计时预设已迁 8266 store，不在此 cfg 内)")
 print("done")
