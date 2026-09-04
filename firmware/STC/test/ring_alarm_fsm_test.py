@@ -89,16 +89,16 @@ check("#1 贪睡到点重生 ring_alarm=4", s.ring_alarm == 4)
 check("#1 贪睡到点重生 ring_ticks=240", s.ring_ticks == 240)
 check("#1 贪睡到点重生 snooze_idx=0", s.snooze_idx == 0)
 
-# 闹钟 1..3 同样形状（回归）
-for a in (1, 2, 3):
+# RING 长鸣 ring_alarm=5（决策⑨：8266 判闹钟/提醒发 RING mode2/3 → 51 统一 ring_alarm=5）同样形状
+for a in (5, 5):
     s = St()
     s.ring_alarm = a
     s.ring_ticks = 240
     s.key_when_ringing(1)
-    check(f"闹钟{a} UP 贪睡 snooze_idx={a}", s.snooze_idx == a)
+    check(f"RING长鸣(ring_alarm={a}) UP 贪睡 snooze_idx={a}", s.snooze_idx == a)
     for _ in range(1200):
         s.tick()
-    check(f"闹钟{a} 重生 ring_alarm={a}", s.ring_alarm == a)
+    check(f"RING长鸣(ring_alarm={a}) 重生 ring_alarm={a}", s.ring_alarm == a)
 
 # #2 亮度确认落盘
 cfg, saved = bright_confirm(3, {"bright_mode": 0, "bright_lvl": 0})
