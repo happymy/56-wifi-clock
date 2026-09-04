@@ -191,11 +191,12 @@ static void h_sta_root() {
         long offv = (signed char)g_cfg[3];
         snprintf_P(b, sizeof(b), PSTR("当前补偿 %+ld°C"), offv);
         srv.sendContent(b);
-        srv.sendContent(PSTR("<br>输入单位 "));
+        srv.sendContent(PSTR("<div style='width:100%'></div>输入单位 "));
         radio2("cal_unit", g_cfg[12], "摄氏°C", "华氏°F");
-        srv.sendContent(PSTR("<br>时钟读数 <input type=number name=cal_disp step=0.1> °"
-                             " 实际温度 <input type=number name=cal_real step=0.1> °"));
-        srv.sendContent(PSTR("<span class=hint>先让时钟显示温度，抄下读数；填实际环境温度，保存自动补偿。</span>"));
+        srv.sendContent(PSTR("<div style='width:100%'></div>时钟读数 <input type=number name=cal_disp step=0.1> °"
+                             "<div style='width:100%'></div>实际温度 <input type=number name=cal_real step=0.1> °"));
+        srv.sendContent(PSTR("<div style='width:100%' class=hint style='color:#c0392b'>上电后请等几分钟，温度读数稳定了再校准（NTC 附近会发热）。</div>"
+                             "<span class=hint>先让时钟显示温度，抄下读数；填实际环境温度，保存自动补偿。</span>"));
     } row_end();
     section_end();
 
@@ -322,18 +323,15 @@ static void h_sta_save() {
         send_set_cfg();               /* 完整 13B 下发（整帧覆盖，铁律） */
         store_save_cfg_blob();
     }
-    char b[96];
     srv.setContentLength(CONTENT_LENGTH_UNKNOWN);
     srv.send(200, HT, "");
-    /* 回显成功/失败：时钟已应答（g_cfg_valid）=下推生效；否则仅本机暂存，提示重启同步 */
-    snprintf_P(b, sizeof(b), PSTR("<meta charset=utf-8><title>保存结果</title>"
+    srv.sendContent(PSTR("<meta charset=utf-8><title>保存结果</title>"
         "<meta name=viewport content='width=device-width,initial-scale=1'>"
         "<style>body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:420px;margin:24px auto;padding:0 16px;color:#222}"
         ".ok{background:#e7f6ec;border:1px solid #b7e3c4;border-radius:8px;padding:12px;font-size:14px;margin-bottom:12px}"
         ".warn{background:#fff5e6;border:1px solid #ffd9a0;border-radius:8px;padding:12px;font-size:14px;margin-bottom:12px}"
         "a.btn{display:inline-block;padding:8px 18px;border-radius:6px;background:#06c;color:#fff;text-decoration:none}</style>"
         "<h2>保存结果</h2>"));
-    srv.sendContent(b);
     if (g_cfg_valid)
         srv.sendContent(PSTR("<div class=ok>✓ 配置已保存并下推时钟（亮度、闹钟等即时生效）。</div>"));
     else
